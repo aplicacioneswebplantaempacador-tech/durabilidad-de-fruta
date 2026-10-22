@@ -17,6 +17,7 @@ window.CONFIG = {
 
   // 3) Novedades que la auxiliar puede marcar (puede agregar o quitar)
   NOVEDADES: [
+    "Enferma",
     "Hongo / moho",
     "Pudrición en base",
     "Deshidratación de corona",
