@@ -50,6 +50,7 @@
     let pin = "";
     $("#chipAux").hidden = true;
     app.innerHTML = `<div class="pin-caja">
+      <img src="icono-512.png" class="pin-logo" alt="Durabilidad de Fruta">
       <h2>Ingrese el PIN</h2><p class="suave">Solo para auxiliares de calidad</p>
       <div class="pin-puntos">${"<i></i>".repeat(4)}</div>
       <div class="teclado">${[1, 2, 3, 4, 5, 6, 7, 8, 9, "", 0, "⌫"].map(n => n === "" ? "<span></span>" : `<button data-n="${n}">${n}</button>`).join("")}</div>
@@ -72,7 +73,7 @@
 
   // ---------------- AUXILIAR ----------------
   async function vistaAuxiliar() {
-    app.innerHTML = `<div class="tarjeta" style="max-width:460px;margin:20px auto"><h2>¿Quién registra hoy?</h2>
+    app.innerHTML = `<div class="tarjeta" style="max-width:460px;margin:20px auto;text-align:left"><img src="icono-192.png" alt="" style="width:64px;height:64px;border-radius:16px;float:right;margin-left:10px"><h2>¿Quién registra hoy?</h2>
       <p class="suave">Seleccione su nombre. Quedará en cada dato y foto que tome hoy.</p><div class="lista-aux" id="listaAux"><p class="suave">Cargando…</p></div></div>`;
     let lista = [];
     try { lista = await DB.listarAuxiliares(); } catch (e) { toast(e.message, true); }
@@ -103,7 +104,7 @@
         <span class="etq">Inicio ${K.fechaLarga(e.fecha_inicio)}</span><span class="etq">${e.num_muestras} muestras</span></div>
         <div class="barra-prog"><div style="width:${pct}%"></div></div></div>`;
     };
-    $("#lista").innerHTML = (!ens.length ? `<div class="vacio"><div style="font-size:48px">🍍</div><p>Aún no hay ensayos.<br>Toque <b>Nuevo ensayo</b> para empezar.</p></div>` : "") +
+    $("#lista").innerHTML = (!ens.length ? `<div class="vacio"><img src="icono-192.png" alt="" style="width:84px;height:84px;border-radius:20px;box-shadow:0 6px 18px rgba(27,94,32,.25)"><p>Aún no hay ensayos.<br>Toque <b>Nuevo ensayo</b> para empezar.</p></div>` : "") +
       (activos.length ? `<div class="titulo-seccion">En curso (${activos.length})</div>` + activos.map(item).join("") : "") +
       (cerrados.length ? `<div class="titulo-seccion">Cerrados (${cerrados.length})</div>` + cerrados.map(item).join("") : "");
     app.querySelectorAll(".ensayo-item").forEach(el => el.onclick = () => abrirEnsayo(el.dataset.id));

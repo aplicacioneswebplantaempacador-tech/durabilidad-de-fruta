@@ -179,3 +179,14 @@ table.simple td{border-bottom:1px solid #edf0ea;padding:9px 6px;vertical-align:t
 .cargando{position:fixed;inset:0;background:rgba(244,246,241,.85);z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-weight:700;color:var(--verde)}
 .giro{width:46px;height:46px;border:5px solid #cfe3c7;border-top-color:var(--verde2);border-radius:50%;animation:gira 1s linear infinite}
 @keyframes gira{to{transform:rotate(360deg)}}
+
+/* ===== Marca de agua e imagen de marca ===== */
+body{background:radial-gradient(circle at 50% 30%,#fbfcf8 0%,var(--fondo) 55%,#e9eee3 100%) fixed}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:url("marca-agua.webp") no-repeat center 58%/min(78vw,560px) auto;opacity:.09;filter:saturate(1.1)}
+main,.barra,.aviso-demo{position:relative;z-index:1}
+.barra{z-index:20}
+.tarjeta,.kpi,.muestra,.dia,.lista-aux button,.teclado button{background-color:rgba(255,255,255,.93)}
+.logo{width:38px;height:38px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.pin-logo{width:118px;height:118px;border-radius:28px;box-shadow:0 8px 24px rgba(27,94,32,.28);margin:6px auto 14px;display:block}
+.pin-caja h2{color:var(--verde)}
