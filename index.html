@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1b5e20">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Durabilidad de Fruta · Agrícola Guapa</title>
+  <link rel="icon" href="icono.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq" id="btnInicio">
+      <img src="icono.svg" alt="" class="logo">
+      <div>
+        <div class="barra-titulo">Durabilidad de Fruta</div>
+        <div class="barra-sub">Agrícola Guapa · Calidad</div>
+      </div>
+    </div>
+    <button class="chip-aux" id="chipAux" hidden></button>
+  </header>
+  <div id="avisoDemo" class="aviso-demo" hidden>MODO DEMO · los datos se guardan solo en este equipo</div>
+
+  <main id="app"></main>
+
+  <div id="hoja" class="hoja" hidden></div>
+  <div id="toast" class="toast" hidden></div>
+  <div id="cargando" class="cargando" hidden><div class="giro"></div><div id="cargandoTxt">Cargando…</div></div>
+
+  <script src="supabase.js"></script>
+  <script src="docx.umd.js"></script>
+  <script src="config.js"></script>
+  <script src="datos.js"></script>
+  <script src="calculos.js"></script>
+  <script src="informe.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

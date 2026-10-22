@@ -1,0 +1,9 @@
+{
+  "name": "Durabilidad de Fruta · Agrícola Guapa",
+  "short_name": "Durabilidad",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f6f1",
+  "theme_color": "#1b5e20",
+  "icons": [{ "src": "icono.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
