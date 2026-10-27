@@ -98,9 +98,9 @@
       const dia = Math.max(0, Math.min(e.dias_ensayo, difDias(e.fecha_inicio, hoyISO())));
       const pct = e.estado === "cerrado" ? 100 : Math.round(dia / e.dias_ensayo * 100);
       return `<div class="tarjeta ensayo-item" data-id="${e.id}">
-        <div class="fila entre"><h3>Lote ${esc(e.lote)}${e.bloque ? " · Bloque " + esc(e.bloque) : ""}</h3>
+        <div class="fila entre"><h3>${esc(K.titulo(e))}</h3>
         <span class="etq ${e.estado === "activo" ? "verde" : "gris"}">${e.estado === "activo" ? "Día " + dia + " de " + e.dias_ensayo : "Cerrado"}</span></div>
-        <div class="etiquetas"><span class="etq">Forza ${esc(e.grupo_forza)}</span>${e.subgrupo_maduracion ? `<span class="etq">Subgrupo ${esc(e.subgrupo_maduracion)}</span>` : ""}
+        <div class="etiquetas">${K.tipoDe(e) ? `<span class="etq tipo-${K.tipoDe(e)}">${esc(K.tipoTxt(e))}</span>` : ""}<span class="etq">${esc(e.grupo_forza)}</span>${e.subgrupo_maduracion ? `<span class="etq">Subgrupo ${esc(e.subgrupo_maduracion)}</span>` : ""}
         <span class="etq">Inicio ${K.fechaLarga(e.fecha_inicio)}</span><span class="etq">${e.num_muestras} muestras</span></div>
         <div class="barra-prog"><div style="width:${pct}%"></div></div></div>`;
     };
@@ -113,14 +113,22 @@
   // ---------------- NUEVO ENSAYO ----------------
   function vistaNuevo() {
     const h = hoyISO();
+    const BL = window.BLOQUES || [];
+    const grupos = [...new Set(BL.map(b => b[2]))].sort();
+    const grupoDe = b => (BL.find(x => x[0] === b) || [])[2];
+    const tipoDeB = b => (BL.find(x => x[0] === b) || [])[1];
+    // Código del bloque: 2 letras (PC/SC) + 6 dígitos = lote (2) + bloque (2) + año (2)
+    const loteDeB = b => { const m = /^[A-Z]{2}(\d{2})\d{4}$/.exec(b || ""); return m ? m[1] : ""; };
     app.innerHTML = `<h2 style="margin-bottom:12px">Nuevo ensayo de durabilidad</h2>
     <form id="fNuevo">
       <div class="tarjeta">
         <div class="titulo-seccion" style="margin-top:0">Origen de la fruta</div>
         <div class="rejilla2">
-          <label class="campo"><span>Lote *</span><input class="entrada" name="lote" required inputmode="numeric"></label>
-          <label class="campo"><span>Bloque</span><input class="entrada" name="bloque"></label>
-          <label class="campo"><span>Grupo Forza *</span><input class="entrada" name="grupo_forza" required></label>
+          <label class="campo"><span>Grupo Forza *</span><select class="entrada" name="grupo_forza" id="selGrupo" required><option value="">Seleccione…</option>${grupos.map(g => `<option>${g}</option>`).join("")}</select></label>
+          <label class="campo"><span>Bloque *</span><select class="entrada" name="bloque" id="selBloque" required></select></label>
+          <div id="avisoBloque" class="aviso-bloque" hidden></div>
+          <label class="campo"><span>Tipo de cosecha</span><div class="entrada solo-lectura" id="tipoCosecha">Se llena solo al elegir el bloque</div></label>
+          <label class="campo"><span>Lote</span><input class="entrada solo-lectura" name="lote" id="inLote" readonly tabindex="-1" placeholder="Se llena solo"></label>
           <label class="campo"><span>Subgrupo maduración</span><input class="entrada" name="subgrupo_maduracion" placeholder="Ej: 1 - C"></label>
           <label class="campo"><span>Calibre</span><input class="entrada" name="calibre" placeholder="Ej: PE1"></label>
           <label class="campo"><span>Temperatura de almacenamiento</span><input class="entrada" name="temperatura_almacen" placeholder="Ej: 30 °C ambiente"></label>
@@ -145,12 +153,41 @@
       <div class="fila"><button type="button" class="btn btn-borde" id="cancelar">Cancelar</button><button class="btn btn-pri" style="flex:1">Crear ensayo</button></div>
     </form>`;
     $("#cancelar").onclick = irInicio;
+    const sg = $("#selGrupo"), sb = $("#selBloque"), av = $("#avisoBloque"), tc = $("#tipoCosecha"), btn = $("#fNuevo button.btn-pri");
+    const opciones = (lista) => lista.map(b => `<option value="${b[0]}">${b[0]}  ·  ${b[1]}</option>`).join("");
+    const llenarBloques = () => {
+      const g = sg.value, actual = sb.value;
+      let html = `<option value="">Seleccione…</option>`;
+      if (g) {
+        html += `<optgroup label="Bloques del ${g}">${opciones(BL.filter(b => b[2] === g))}</optgroup>`;
+        html += `<optgroup label="Otros grupos">${opciones(BL.filter(b => b[2] !== g))}</optgroup>`;
+      } else grupos.forEach(gr => html += `<optgroup label="${gr}">${opciones(BL.filter(b => b[2] === gr))}</optgroup>`);
+      sb.innerHTML = html; sb.value = actual;
+    };
+    const validar = () => {
+      const g = sg.value, b = sb.value, t = tipoDeB(b);
+      tc.textContent = t ? `${t} · ${window.TIPOS_COSECHA[t]}` : "Se llena solo al elegir el bloque";
+      $("#inLote").value = loteDeB(b);
+      tc.className = "entrada solo-lectura" + (t ? " tipo-" + t : "");
+      const malo = g && b && grupoDe(b) !== g;
+      av.hidden = !malo;
+      if (malo) av.innerHTML = `⚠️ El bloque <b>${b}</b> no está en el grupo <b>${g}</b>. Pertenece al <b>${grupoDe(b)}</b>. Corrija el grupo o el bloque.`;
+      sb.classList.toggle("error", !!malo); sg.classList.toggle("error", !!malo);
+      btn.disabled = !!malo;
+      return !malo;
+    };
+    sg.onchange = () => { llenarBloques(); validar(); };
+    sb.onchange = () => { if (!sg.value && sb.value) { sg.value = grupoDe(sb.value); llenarBloques(); } validar(); };
+    llenarBloques();
     $("#fNuevo").onsubmit = async ev => {
       ev.preventDefault();
+      if (!validar()) return toast("El bloque no corresponde al grupo Forza", true);
       const f = Object.fromEntries(new FormData(ev.target));
       Object.keys(f).forEach(k => { f[k] = String(f[k]).trim(); if (f[k] === "") f[k] = null; });
       f.num_muestras = +f.num_muestras; f.dias_ensayo = +f.dias_ensayo;
       f.semana = semanaISO(f.fecha_inicio); f.creado_por = S.auxiliar;
+      f.tipo_cosecha = tipoDeB(f.bloque) || null;
+      f.lote = loteDeB(f.bloque) || null;
       const ens = await tarea("Creando ensayo…", () => DB.crearEnsayo(f));
       toast("Ensayo creado ✓"); abrirEnsayo(ens.id);
     };
@@ -185,10 +222,11 @@
 
     app.innerHTML = `
     <div class="tarjeta cab-ensayo">
-      <div class="fila entre"><h2>Lote ${esc(e.lote)}${e.bloque ? " · Bloque " + esc(e.bloque) : ""}</h2>
+      <div class="fila entre"><h2>${esc(K.titulo(e))}</h2>
         <span class="etq ${e.estado === "activo" ? "verde" : "gris"}">${e.estado === "activo" ? "En curso" : "Cerrado"}</span></div>
       <div class="datos-mini">
         <div>Grupo Forza<b>${esc(e.grupo_forza)}</b></div>
+        <div>Tipo de cosecha<b>${esc(K.tipoTxt(e) || "—")}</b></div>
         <div>Subgrupo<b>${esc(e.subgrupo_maduracion || "—")}</b></div>
         <div>Calibre<b>${esc(e.calibre || "—")}</b></div>
         <div>Inicio · Sem ${e.semana || "—"}<b>${K.fechaLarga(e.fecha_inicio)}</b></div>
@@ -287,7 +325,7 @@
     hoja.innerHTML = `<div class="hoja-cuerpo">
       <div class="hoja-cab">
         <button class="nav-m" id="mAnt" ${idx === 0 ? "disabled" : ""}>‹</button>
-        <div style="text-align:center"><h2>Muestra ${m.numero}</h2><div class="suave peq">Día ${d} · Lote ${esc(e.lote)}</div></div>
+        <div style="text-align:center"><h2>Muestra ${m.numero}</h2><div class="suave peq">Día ${d} · ${esc(e.bloque || "Lote " + (e.lote || ""))}${K.tipoDe(e) ? " · " + K.tipoDe(e) : ""}</div></div>
         <div class="fila" style="gap:6px"><button class="nav-m" id="mSig" ${idx === muestras.length - 1 ? "disabled" : ""}>›</button><button class="x" id="cerrarH">✕</button></div>
       </div>
       ${retiradaAntes ? `<div class="tarjeta" style="background:var(--rojo-claro)">Esta muestra fue declarada <b>no comercial el día ${m.dia_fin_vida}</b>. Puede registrar si quiere seguir observándola, pero no es obligatorio.</div>` : ""}
@@ -396,7 +434,7 @@
     const A = K.analizar(S.datos);
     const dl = diasLab(e);
     app.innerHTML = `
-    <div class="fila entre" style="margin-bottom:12px"><button class="btn btn-borde" id="volverE">← Volver</button><h2 style="text-align:right">Resumen · Lote ${esc(e.lote)}</h2></div>
+    <div class="fila entre" style="margin-bottom:12px"><button class="btn btn-borde" id="volverE">← Volver</button><h2 style="text-align:right">Resumen · ${esc(e.bloque || "Lote " + (e.lote || ""))}</h2></div>
     <div class="concepto" style="background:${A.concepto.color}"><div class="peq" style="opacity:.85;font-weight:700">CONCEPTO GENERAL</div><h3>${A.concepto.nivel}</h3><div>${esc(A.concepto.texto)}</div></div>
     <div class="kpis">
       <div class="kpi"><div class="v">${A.nComerciales && A.ultimoDia ? "≥ " : ""}${K.num(A.durabilidadProm)}</div><div class="l">Durabilidad promedio (días)${A.nComerciales && A.ultimoDia ? " · aún hay muestras comerciales" : ""}</div></div>

@@ -106,8 +106,8 @@
     // ---------------- Textos del resumen ejecutivo ----------------
     const t = [];
     const rangoIni = ms.filter(m => m.colorInicial != null).map(m => Number(m.colorInicial));
-    t.push(`El ensayo de durabilidad del lote ${ensayo.lote}` + (ensayo.bloque ? `, bloque ${ensayo.bloque}` : "") +
-      ` (Grupo Forza ${ensayo.grupo_forza}) inició el ${fechaLarga(ensayo.fecha_inicio)} con ${N} muestras` +
+    t.push(`El ensayo de durabilidad del bloque ${ensayo.bloque || "—"}` + (tipoDe(ensayo) ? ` (${((window.TIPOS_COSECHA || {})[tipoDe(ensayo)] || "").toLowerCase()}, ${tipoDe(ensayo)})` : "") + (ensayo.lote ? `, lote ${ensayo.lote}` : "") +
+      `, Grupo Forza ${ensayo.grupo_forza}, inició el ${fechaLarga(ensayo.fecha_inicio)} con ${N} muestras` +
       (colorIni != null ? ` de color inicial promedio ${num(colorIni)} (rango ${num(Math.min(...rangoIni))} a ${num(Math.max(...rangoIni))})` : "") +
       (ensayo.temperatura_almacen ? `, almacenadas a ${ensayo.temperatura_almacen}` : "") +
       `. Se realizó seguimiento hasta el día ${ultimoDia}` + (ultimoDia < D ? ` de ${D} programados.` : "."));
@@ -115,8 +115,8 @@
       t.push(retiradas.length
         ? `${nComerciales} de ${N} muestras (${num(pctComerciales, 0)} %) se mantuvieron comerciales hasta el día ${ultimoDia}. ` +
           `${retiradas.length} muestra(s) fueron declaradas no comerciales entre el día ${Math.min(...durRet)} y el día ${Math.max(...durRet)}` +
-          ` (promedio de retiro: día ${num(prom(durRet))}). La durabilidad promedio del lote es de ${nComerciales ? "al menos " : ""}${num(durabilidadProm)} días.`
-        : `Todas las muestras (${N} de ${N}) se mantuvieron en condición comercial hasta el día ${ultimoDia}, por lo que la durabilidad del lote es de al menos ${ultimoDia} días.`);
+          ` (promedio de retiro: día ${num(prom(durRet))}). La durabilidad promedio del bloque es de ${nComerciales ? "al menos " : ""}${num(durabilidadProm)} días.`
+        : `Todas las muestras (${N} de ${N}) se mantuvieron en condición comercial hasta el día ${ultimoDia}, por lo que la durabilidad del bloque es de al menos ${ultimoDia} días.`);
     }
     if (avance != null) {
       t.push(`El color externo avanzó de ${num(colorIni)} a ${num(colorFin)} en promedio (${avance >= 0 ? "+" : ""}${num(avance)} grados en ${diaColorFin} días, ` +
@@ -185,5 +185,12 @@
     return s + "</svg>";
   }
 
-  window.CALC = { ESCALA, colorHex, colorRGB, textoSobre, num, fechaLarga, analizar, graficaSVG };
+  function tipoDe(e) {
+    if (e.tipo_cosecha) return e.tipo_cosecha;
+    const b = (window.BLOQUES || []).find(x => x[0] === e.bloque); return b ? b[1] : null;
+  }
+  function tipoTxt(e) { const t = tipoDe(e); return t ? `${t} · ${(window.TIPOS_COSECHA || {})[t] || ""}`.replace(/ · $/, "") : ""; }
+  function titulo(e) { return (e.bloque ? "Bloque " + e.bloque : "Lote " + (e.lote || "—")) + (e.bloque && e.lote ? " · Lote " + e.lote : ""); }
+
+  window.CALC = { tipoDe, tipoTxt, titulo, ESCALA, colorHex, colorRGB, textoSobre, num, fechaLarga, analizar, graficaSVG };
 })();

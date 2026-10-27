@@ -3,7 +3,8 @@
 // =====================================================================
 (function () {
   const K = () => window.CALC;
-  const VERDE = "1B5E20", VERDE_CLARO = "E8F3E3", GRIS = "F3F5F1", BORDE = "D5DCCF";
+  const NEGRO = "1C1C1C", ARENA = "A89F80", ARENA_CLARA = "F1EEE6", GRIS = "F6F5F2", BORDE = "DAD6CB", TEXTO = "2B2B2B", SUAVE = "77756D";
+  const VERDE = NEGRO, VERDE_CLARO = ARENA_CLARA; // compatibilidad
 
   async function svgAPng(svg, ancho, alto, escala = 2) {
     const img = new Image();
@@ -27,6 +28,15 @@
     return { data: new Uint8Array(await b.arrayBuffer()), w: cv.width, h: cv.height };
   }
 
+  let logoCache = null;
+  async function logo() {
+    if (logoCache) return logoCache;
+    const r = await fetch("logo-guapa.png"); if (!r.ok) throw new Error("No se encontró logo-guapa.png");
+    const b = await r.blob(); const bmp = await createImageBitmap(b);
+    logoCache = { data: new Uint8Array(await b.arrayBuffer()), w: bmp.width, h: bmp.height };
+    return logoCache;
+  }
+
   async function generar(datos, A, opc) {
     const d = window.docx, C = window.CONFIG, k = K();
     const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, ImageRun, Header, Footer, PageNumber,
@@ -37,7 +47,9 @@
     // ---------- ayudantes ----------
     const T = (text, o = {}) => new TextRun({ text: String(text ?? ""), ...o });
     const P = (hijos, o = {}) => new Paragraph({ children: Array.isArray(hijos) ? hijos : [typeof hijos === "string" ? T(hijos) : hijos], spacing: { after: 100 }, ...o });
-    const H1 = t => new Paragraph({ heading: HeadingLevel.HEADING_1, children: [T(t)] });
+    let nSec = 0;
+    const H1 = t => { const txt = t.replace(/^\d+\.\s*/, ""); nSec++;
+      return new Paragraph({ heading: HeadingLevel.HEADING_1, children: [T(String(nSec).padStart(2, "0") + "   ", { color: ARENA, bold: true }), T(txt.toUpperCase(), { characterSpacing: 20 })] }); };
     const H2 = t => new Paragraph({ heading: HeadingLevel.HEADING_2, children: [T(t)] });
     const bordes = { top: { style: BorderStyle.SINGLE, size: 4, color: BORDE }, bottom: { style: BorderStyle.SINGLE, size: 4, color: BORDE }, left: { style: BorderStyle.SINGLE, size: 4, color: BORDE }, right: { style: BorderStyle.SINGLE, size: 4, color: BORDE } };
     const sinBordes = { top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }, right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } };
@@ -50,26 +62,45 @@
     });
     const tabla = (anchos, filas) => new Table({ width: { size: ANCHO, type: WidthType.DXA }, columnWidths: anchos, layout: TableLayoutType.FIXED, rows: filas });
     const fila = (celdas, cab = false) => new TableRow({ children: celdas, tableHeader: cab, cantSplit: true });
-    const cabecera = (titulos, anchos) => fila(titulos.map((t, i) => celda(t, anchos[i], { fondo: VERDE, color: "FFFFFF", negrita: true, tam: 18 })), true);
+    const LG = await logo();
+    const imgLogo = alto => new ImageRun({ data: LG.data, transformation: { width: Math.round(alto * LG.w / LG.h), height: alto } });
+    const titulo = k.titulo(e);
+    const tipoTxt = k.tipoTxt(e);
+    const fIni = String(e.fecha_inicio || "").replace(/-/g, "");
+    const codigo = `DUR-${(e.bloque || e.lote || "SB").toString().replace(/[^\w]/g, "")}-${fIni}`;
+    const hoyTxt = new Date().toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
+    const cabecera = (titulos, anchos) => fila(titulos.map((t, i) => celda(t, anchos[i], { fondo: NEGRO, color: "FFFFFF", negrita: true, tam: 17 })), true);
     const hexSin = v => k.colorHex(v).slice(1).toUpperCase();
     const txtSobre = v => k.textoSobre(v).slice(1).toUpperCase();
     const espacio = () => new Paragraph({ spacing: { after: 120 }, children: [] });
 
     const hijos = [];
 
-    // ---------- PORTADA / ENCABEZADO DEL INFORME ----------
-    hijos.push(new Paragraph({ spacing: { after: 40 }, children: [T("AGRÍCOLA GUAPA · ÁREA DE CALIDAD", { bold: true, color: "7A8A70", size: 18 })] }));
-    hijos.push(new Paragraph({ spacing: { after: 60 }, children: [T("Informe de Durabilidad de Fruta", { bold: true, color: VERDE, size: 44 })] }));
-    hijos.push(new Paragraph({ spacing: { after: 200 }, children: [T(`Piña MD2 · Lote ${e.lote}${e.bloque ? " · Bloque " + e.bloque : ""} · Grupo Forza ${e.grupo_forza}`, { size: 24, color: "444444" })] }));
+    // ---------- PORTADA CORPORATIVA ----------
+    hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 260 }, children: [imgLogo(150)] }));
+    hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [T("INFORME TÉCNICO DE CALIDAD", { bold: true, color: ARENA, size: 20, characterSpacing: 60 })] }));
+    hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [T("Ensayo de Durabilidad de Fruta", { bold: true, color: NEGRO, size: 52 })] }));
+    hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [T(`Piña MD2  ·  ${titulo}  ·  ${e.grupo_forza || ""}`, { size: 24, color: TEXTO })] }));
+    if (tipoTxt) hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [T(tipoTxt.toUpperCase(), { bold: true, size: 20, color: ARENA, characterSpacing: 30 })] }));
+    hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: ARENA, space: 1 } }, children: [] }));
 
-    // Concepto general (franja de color)
+    // Ficha del documento
+    const ficha = [["Código del informe", codigo], ["Fecha de emisión", hoyTxt], ["Área", "Cosecha · Control de calidad"], ["Inicio del ensayo (Día 0)", k.fechaLarga(e.fecha_inicio)], ["Estado del ensayo", e.estado === "cerrado" ? "Cerrado" : `En curso (día ${A.ultimoDia} de ${e.dias_ensayo})`]];
+    const aFi = [3400, 6800];
+    hijos.push(tabla(aFi, ficha.map(([a1, b1], i) => fila([
+      celda(a1.toUpperCase(), aFi[0], { fondo: i % 2 ? "FFFFFF" : GRIS, color: SUAVE, negrita: true, tam: 15, bordes: { ...sinBordes, bottom: { style: BorderStyle.SINGLE, size: 4, color: BORDE } } }),
+      celda(b1, aFi[1], { fondo: i % 2 ? "FFFFFF" : GRIS, tam: 20, negrita: i === 0, bordes: { ...sinBordes, bottom: { style: BorderStyle.SINGLE, size: 4, color: BORDE } } })]))));
+    hijos.push(espacio());
+
+    // Concepto general
     const colConcepto = A.concepto.color.replace("#", "").toUpperCase();
     hijos.push(tabla([ANCHO], [fila([new TableCell({
-      width: { size: ANCHO, type: WidthType.DXA }, borders: sinBordes, shading: { fill: colConcepto, type: ShadingType.CLEAR, color: "auto" },
-      margins: { top: 160, bottom: 160, left: 220, right: 220 },
-      children: [P([T("CONCEPTO GENERAL", { bold: true, color: "FFFFFF", size: 16 })], { spacing: { after: 40 } }),
-      P([T(A.concepto.nivel, { bold: true, color: "FFFFFF", size: 32 })], { spacing: { after: 40 } }),
-      P([T(A.concepto.texto, { color: "FFFFFF", size: 21 })], { spacing: { after: 0 } })]
+      width: { size: ANCHO, type: WidthType.DXA }, borders: { ...sinBordes, left: { style: BorderStyle.SINGLE, size: 48, color: colConcepto } },
+      shading: { fill: ARENA_CLARA, type: ShadingType.CLEAR, color: "auto" },
+      margins: { top: 160, bottom: 160, left: 260, right: 220 },
+      children: [P([T("CONCEPTO GENERAL", { bold: true, color: SUAVE, size: 15, characterSpacing: 30 })], { spacing: { after: 40 } }),
+      P([T(A.concepto.nivel, { bold: true, color: colConcepto, size: 34 })], { spacing: { after: 40 } }),
+      P([T(A.concepto.texto, { color: TEXTO, size: 20 })], { spacing: { after: 0 } })]
     })])]));
     hijos.push(espacio());
 
@@ -77,23 +108,25 @@
     const kpis = [
       [(A.nComerciales && A.ultimoDia ? "≥ " : "") + k.num(A.durabilidadProm), "Durabilidad promedio (días)"],
       [`${A.nComerciales}/${A.N}`, `Comerciales al día ${A.ultimoDia}`],
-      [`${k.num(A.colorIni)} → ${k.num(A.colorFin)}`, "Color promedio inicial → final"],
+      [`${k.num(A.colorIni)} → ${k.num(A.colorFin)}`, "Color inicial → final"],
       [A.velocidad != null ? "+" + k.num(A.velocidad, 2) : "—", "Avance de color por día"],
       [A.primeraNov ? "Día " + A.primeraNov.primeraNovedad.dia : "Ninguna", "Primera novedad"]
     ];
     const aK = ANCHO / 5;
-    hijos.push(tabla(kpis.map(() => aK), [fila(kpis.map(([v, l]) => new TableCell({
-      width: { size: aK, type: WidthType.DXA }, borders: { ...sinBordes, left: { style: BorderStyle.SINGLE, size: 18, color: "F5B400" } },
-      shading: { fill: GRIS, type: ShadingType.CLEAR, color: "auto" }, margins: { top: 100, bottom: 100, left: 140, right: 80 },
-      children: [P([T(v, { bold: true, size: 30, color: "1F2A1C" })], { spacing: { after: 20 } }), P([T(l, { size: 16, color: "6B7566" })], { spacing: { after: 0 } })]
+    hijos.push(tabla(kpis.map(() => aK), [fila(kpis.map(([v, l], i) => new TableCell({
+      width: { size: aK, type: WidthType.DXA }, borders: { ...sinBordes, left: i ? { style: BorderStyle.SINGLE, size: 4, color: "4A4A4A" } : sinBordes.left },
+      shading: { fill: NEGRO, type: ShadingType.CLEAR, color: "auto" }, margins: { top: 140, bottom: 140, left: 160, right: 80 },
+      children: [P([T(v, { bold: true, size: 30, color: "FFFFFF" })], { spacing: { after: 30 } }), P([T(l.toUpperCase(), { size: 13, color: "CFC8B0", characterSpacing: 10 })], { spacing: { after: 0 } })]
     })))]));
+    hijos.push(new Paragraph({ children: [new PageBreak()] }));
 
     // ---------- 1. DATOS DEL ENSAYO ----------
     hijos.push(H1("1. Datos del ensayo"));
     const datosE = [
       ["Fecha de inicio (Día 0)", k.fechaLarga(e.fecha_inicio)], ["Semana", e.semana ?? "—"],
-      ["Lote", e.lote], ["Bloque", e.bloque || "—"],
-      ["Grupo Forza", e.grupo_forza], ["Subgrupo de maduración", e.subgrupo_maduracion || "—"],
+      ["Bloque", e.bloque || "—"], ["Tipo de cosecha", tipoTxt || "—"],
+      ["Grupo Forza", e.grupo_forza], ["Lote", e.lote || "—"],
+      ["Subgrupo de maduración", e.subgrupo_maduracion || "—"], ["Código del informe", codigo],
       ["Calibre", e.calibre || "—"], ["Temperatura de almacenamiento", e.temperatura_almacen || "—"],
       ["Aplicación con", e.aplicacion || "No aplica"], ["Dosis", e.dosis || "—"],
       ["Número de muestras", e.num_muestras], ["Días programados / evaluados", `${e.dias_ensayo} / ${A.ultimoDia}`],
@@ -103,7 +136,7 @@
     const filasD = [];
     for (let i = 0; i < datosE.length; i += 2) {
       const [a, b] = [datosE[i], datosE[i + 1] || ["", ""]];
-      filasD.push(fila([celda(a[0], a4[0], { fondo: VERDE_CLARO, negrita: true, tam: 18 }), celda(a[1], a4[1]), celda(b[0], a4[2], { fondo: VERDE_CLARO, negrita: true, tam: 18 }), celda(b[1], a4[3])]));
+      filasD.push(fila([celda(a[0], a4[0], { fondo: GRIS, negrita: true, tam: 16, color: SUAVE }), celda(a[1], a4[1]), celda(b[0], a4[2], { fondo: GRIS, negrita: true, tam: 16, color: SUAVE }), celda(b[1], a4[3])]));
     }
     hijos.push(tabla(a4, filasD));
 
@@ -113,7 +146,7 @@
 
     // ---------- 3. EVOLUCIÓN DEL COLOR ----------
     hijos.push(H1("3. Evolución del color externo"));
-    hijos.push(P([T("Escala de color de 0,0 (verde) a 6,0 (amarillo-naranja), en pasos de 0,5. La línea gruesa es el promedio; las líneas grises son cada muestra; la franja muestra el rango mínimo–máximo.", { size: 18, color: "6B7566" })]));
+    hijos.push(P([T("Escala de color de 0,0 (verde) a 6,0 (amarillo-naranja), en pasos de 0,5. La línea gruesa es el promedio; las líneas grises son cada muestra; la franja muestra el rango mínimo–máximo.", { size: 18, color: SUAVE })], { keepNext: true, spacing: { after: 100 } }));
     opc.progreso && opc.progreso("Dibujando gráfica…");
     const png = await svgAPng(k.graficaSVG(A, 720, 340), 720, 340);
     hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ data: png, transformation: { width: 660, height: 312 } })] }));
@@ -131,15 +164,15 @@
         return celda(k.num(r.color) + marca, aDia, { alinear: AlignmentType.CENTER, fondo: hexSin(r.color), color: m.diaFin === dd ? "B71C1C" : txtSobre(r.color), negrita: true, tam: 17 });
       })]));
     });
-    filasM.push(fila([celda("Prom.", aPrim, { negrita: true, fondo: VERDE_CLARO }), ...A.promColorPorDia.map(p => p.n
+    filasM.push(fila([celda("Prom.", aPrim, { negrita: true, fondo: ARENA_CLARA }), ...A.promColorPorDia.map(p => p.n
       ? celda(k.num(p.prom), aDia, { alinear: AlignmentType.CENTER, fondo: hexSin(p.prom), color: txtSobre(p.prom), negrita: true, tam: 17 })
       : celda("", aDia))]));
     hijos.push(tabla(anchosM, filasM));
-    hijos.push(P([T("▲ = novedad registrada ese día · × = día en que la muestra se declaró no comercial · · = fuera del ensayo", { size: 16, color: "6B7566" })], { spacing: { before: 60, after: 120 } }));
+    hijos.push(P([T("▲ = novedad registrada ese día · × = día en que la muestra se declaró no comercial · · = fuera del ensayo", { size: 16, color: SUAVE })], { spacing: { before: 60, after: 120 } }));
 
     // ---------- 4. DURABILIDAD POR MUESTRA ----------
     hijos.push(H1("4. Durabilidad por muestra"));
-    hijos.push(P([T("Días comercial: día del ensayo en que la auxiliar declaró la muestra como no comercial. «≥» indica que la muestra seguía comercial en el último día evaluado.", { size: 18, color: "6B7566" })]));
+    hijos.push(P([T("Días comercial: día del ensayo en que la auxiliar declaró la muestra como no comercial. «≥» indica que la muestra seguía comercial en el último día evaluado.", { size: 18, color: SUAVE })]));
     const aDur = [1000, 1150, 1150, 1300, 2800, 2800];
     hijos.push(tabla(aDur, [cabecera(["Muestra", "Color inicial", "Color final", "Días comercial", "Primera novedad", "Motivo de retiro"], aDur),
     ...A.ms.map(m => fila([
@@ -165,7 +198,7 @@
       ...A.novedadesLista.map(n => fila([celda(String(n.dia), aB[0], { alinear: AlignmentType.CENTER }), celda("M" + n.muestra, aB[1], { alinear: AlignmentType.CENTER, negrita: true }),
       celda(n.apariencia || "—", aB[2], { tam: 18, color: n.apariencia === "Mala" ? "C62828" : undefined }),
       celda([new Paragraph({ spacing: { after: 0 }, children: [...(n.noComercial ? [T("NO COMERCIAL. ", { bold: true, color: "C62828", size: 18 })] : []), T(n.tipos.join(", ") + (n.tipos.length && n.observacion ? " — " : "") + n.observacion, { size: 18 })] })], aB[3]),
-      celda(n.auxiliar, aB[4], { tam: 16, color: "6B7566" })]))]));
+      celda(n.auxiliar, aB[4], { tam: 16, color: SUAVE })]))]));
     }
 
     // ---------- 6. LABORATORIO ----------
@@ -186,9 +219,9 @@
     const aF = [4800, 600, 4800];
     const linea = { ...sinBordes, top: { style: BorderStyle.SINGLE, size: 6, color: "333333" } };
     hijos.push(tabla(aF, [fila([
-      celda([P([T("Elaboró (Auxiliar de calidad)", { bold: true, size: 18 })], { spacing: { after: 0 } })], aF[0], { bordes: linea }),
+      celda([P([T("Elaboró", { bold: true, size: 18 })], { spacing: { after: 0 } }), P([T("Auxiliar de calidad", { size: 16, color: SUAVE })], { spacing: { after: 0 } })], aF[0], { bordes: linea }),
       celda("", aF[1], { bordes: sinBordes }),
-      celda([P([T("Revisó (Líder de cosecha / calidad)", { bold: true, size: 18 })], { spacing: { after: 0 } })], aF[2], { bordes: linea })])]));
+      celda([P([T("Revisó y aprobó", { bold: true, size: 18 })], { spacing: { after: 0 } }), P([T("Líder de cosecha", { size: 16, color: SUAVE })], { spacing: { after: 0 } })], aF[2], { bordes: linea })])]));
 
     // ---------- 8. REGISTRO FOTOGRÁFICO ----------
     const fotos = [];
@@ -199,7 +232,7 @@
     if (fotos.length) {
       hijos.push(new Paragraph({ children: [new PageBreak()] }));
       hijos.push(H1("8. Registro fotográfico"));
-      hijos.push(P([T(opc.fotos === "todas" ? "Todas las fotos tomadas durante el ensayo, por muestra y día." : "Fotos de días clave: inicio, días de laboratorio, novedades, retiro y último registro.", { size: 18, color: "6B7566" })]));
+      hijos.push(P([T(opc.fotos === "todas" ? "Todas las fotos tomadas durante el ensayo, por muestra y día." : "Fotos de días clave: inicio, días de laboratorio, novedades, retiro y último registro.", { size: 18, color: SUAVE })]));
       const COLS = 3, aC = Math.floor(ANCHO / COLS), anchoImg = 205;
       let hechas = 0;
       for (const m of A.ms) {
@@ -231,24 +264,46 @@
 
     // ---------- DOCUMENTO ----------
     opc.progreso && opc.progreso("Armando el documento…");
+    const pieTxt = { size: 15, color: SUAVE };
+    const encabezado = new Header({ children: [new Table({
+      width: { size: ANCHO, type: WidthType.DXA }, columnWidths: [1100, 9100], layout: TableLayoutType.FIXED,
+      rows: [new TableRow({ children: [
+        new TableCell({ width: { size: 1100, type: WidthType.DXA }, borders: { ...sinBordes, bottom: { style: BorderStyle.SINGLE, size: 8, color: ARENA } }, verticalAlign: VerticalAlign.CENTER, margins: { bottom: 80 },
+          children: [new Paragraph({ spacing: { after: 0 }, children: [imgLogo(46)] })] }),
+        new TableCell({ width: { size: 9100, type: WidthType.DXA }, borders: { ...sinBordes, bottom: { style: BorderStyle.SINGLE, size: 8, color: ARENA } }, verticalAlign: VerticalAlign.CENTER, margins: { bottom: 80 },
+          children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 0 }, children: [T("ENSAYO DE DURABILIDAD DE FRUTA", { bold: true, size: 16, color: NEGRO, characterSpacing: 20 })] }),
+            new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 0 }, children: [T(`${titulo}  ·  ${e.grupo_forza || ""}${tipoTxt ? "  ·  " + tipoTxt : ""}  ·  ${codigo}`, pieTxt)] })] })
+      ] })]
+    })] });
+    const pie = new Footer({ children: [new Table({
+      width: { size: ANCHO, type: WidthType.DXA }, columnWidths: [6800, 3400], layout: TableLayoutType.FIXED,
+      rows: [new TableRow({ children: [
+        new TableCell({ width: { size: 6800, type: WidthType.DXA }, borders: { ...sinBordes, top: { style: BorderStyle.SINGLE, size: 4, color: BORDE } }, margins: { top: 80 },
+          children: [new Paragraph({ spacing: { after: 0 }, children: [T("AGRÍCOLA GUAPA", { bold: true, size: 15, color: NEGRO, characterSpacing: 20 }), T("  ·  Piña Colombiana del Urabá  ·  Documento interno", pieTxt)] })] }),
+        new TableCell({ width: { size: 3400, type: WidthType.DXA }, borders: { ...sinBordes, top: { style: BorderStyle.SINGLE, size: 4, color: BORDE } }, margins: { top: 80 },
+          children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 0 }, children: [T("Página ", pieTxt), new TextRun({ children: [PageNumber.CURRENT], ...pieTxt }), T(" de ", pieTxt), new TextRun({ children: [PageNumber.TOTAL_PAGES], ...pieTxt })] })] })
+      ] })]
+    })] });
+    const piePortada = new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [T("AGRÍCOLA GUAPA", { bold: true, size: 15, color: NEGRO, characterSpacing: 30 }), T("  ·  Piña Colombiana del Urabá  ·  Documento interno de calidad", pieTxt)] })] });
+
     const doc = new Document({
-      creator: "App Durabilidad · Agrícola Guapa", title: `Informe de durabilidad lote ${e.lote}`,
+      creator: "Agrícola Guapa · App Durabilidad", title: `Informe de durabilidad ${titulo}`,
       styles: {
-        default: { document: { run: { font: "Calibri", size: 21, color: "1F2A1C" } } },
+        default: { document: { run: { font: "Calibri", size: 21, color: TEXTO } } },
         paragraphStyles: [
-          { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true, run: { size: 30, bold: true, color: VERDE, font: "Calibri" }, paragraph: { spacing: { before: 360, after: 140 }, keepNext: true, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: "F5B400", space: 4 } } } },
-          { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true, run: { size: 24, bold: true, color: "2E7D32", font: "Calibri" }, paragraph: { spacing: { before: 220, after: 100 }, keepNext: true } }
+          { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true, run: { size: 26, bold: true, color: NEGRO, font: "Calibri" }, paragraph: { spacing: { before: 360, after: 160 }, keepNext: true, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: ARENA, space: 4 } } } },
+          { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true, run: { size: 22, bold: true, color: "5E573F", font: "Calibri" }, paragraph: { spacing: { before: 220, after: 100 }, keepNext: true } }
         ]
       },
       sections: [{
-        properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1020, bottom: 1020, left: 1020, right: 1020, header: 500, footer: 500 } } },
-        headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [T(`Agrícola Guapa · Durabilidad de fruta · Lote ${e.lote}`, { size: 16, color: "8A9682" })] })] }) },
-        footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [T(`Generado el ${new Date().toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })} · Página `, { size: 16, color: "8A9682" }), new TextRun({ children: [PageNumber.CURRENT], size: 16, color: "8A9682" }), T(" de ", { size: 16, color: "8A9682" }), new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, color: "8A9682" })] })] }) },
+        properties: { titlePage: true, page: { size: { width: 12240, height: 15840 }, margin: { top: 1300, bottom: 1100, left: 1020, right: 1020, header: 450, footer: 450 } } },
+        headers: { default: encabezado, first: new Header({ children: [new Paragraph("")] }) },
+        footers: { default: pie, first: piePortada },
         children: hijos
       }]
     });
     const blob = await Packer.toBlob(doc);
-    const nombre = `Informe_Durabilidad_Lote_${String(e.lote).replace(/[^\w-]+/g, "_")}_${e.fecha_inicio}.docx`;
+    const nombre = `Informe_Durabilidad_${String(e.bloque || e.lote || "ensayo").replace(/[^\w-]+/g, "_")}_${e.fecha_inicio}.docx`;
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nombre;
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
     window.__ultimoInforme = blob; // (para pruebas)
