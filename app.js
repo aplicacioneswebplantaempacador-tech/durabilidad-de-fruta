@@ -132,7 +132,7 @@
           <div class="campo" style="grid-column:1/-1"><span class="lbl-mad">Estado de madurez *</span>
             <div class="madurez" id="selMadurez">${Object.entries(K.MADUREZ).map(([n, m]) => `<button type="button" data-v="${n}" class="mad-${n === "Pintón" ? "Pinton" : n}"><b>${n}</b><small>color ${m.rango}</small></button>`).join("")}</div>
             <input type="hidden" name="madurez" id="inMadurez"></div>
-          <label class="campo"><span>Subgrupo maduración</span><input class="entrada" name="subgrupo_maduracion" placeholder="Ej: 1 - C"></label>
+          <label class="campo"><span>Subgrupo maduración</span><input class="entrada" name="subgrupo_maduracion" id="inSubgrupo" inputmode="tel" maxlength="20" placeholder="Ej: 4  o  3+4" pattern="[0-9+\-\/ ]*" title="Solo números (puede usar + o -)"></label>
           <label class="campo"><span>Calibre</span><input class="entrada" name="calibre" placeholder="Ej: PE1"></label>
           <label class="campo"><span>Temperatura de almacenamiento</span><input class="entrada" name="temperatura_almacen" placeholder="Ej: 30 °C ambiente"></label>
         </div>
@@ -182,6 +182,12 @@
     sg.onchange = () => { llenarBloques(); validar(); };
     sb.onchange = () => { if (!sg.value && sb.value) { sg.value = grupoDe(sb.value); llenarBloques(); } validar(); };
     llenarBloques();
+    // Subgrupo: solo números y los signos + - /
+    const isg = $("#inSubgrupo");
+    isg.oninput = () => {
+      const limpio = isg.value.replace(/[^0-9+\-\/ ]/g, "");
+      if (limpio !== isg.value) { isg.value = limpio; toast("Subgrupo: solo números (puede usar +)", true); }
+    };
     app.querySelectorAll("#selMadurez button").forEach(b => b.onclick = () => {
       $("#inMadurez").value = b.dataset.v;
       app.querySelectorAll("#selMadurez button").forEach(x => x.classList.toggle("sel", x === b));
