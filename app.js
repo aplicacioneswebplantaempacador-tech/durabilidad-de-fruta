@@ -100,7 +100,7 @@
       return `<div class="tarjeta ensayo-item" data-id="${e.id}">
         <div class="fila entre"><h3>${esc(K.titulo(e))}</h3>
         <span class="etq ${e.estado === "activo" ? "verde" : "gris"}">${e.estado === "activo" ? "Día " + dia + " de " + e.dias_ensayo : "Cerrado"}</span></div>
-        <div class="etiquetas">${K.tipoDe(e) ? `<span class="etq tipo-${K.tipoDe(e)}">${esc(K.tipoTxt(e))}</span>` : ""}<span class="etq">${esc(e.grupo_forza)}</span>${e.subgrupo_maduracion ? `<span class="etq">Subgrupo ${esc(e.subgrupo_maduracion)}</span>` : ""}
+        <div class="etiquetas">${e.madurez ? `<span class="etq mad-${e.madurez === "Pintón" ? "Pinton" : e.madurez}">${esc(e.madurez)}</span>` : ""}${K.tipoDe(e) ? `<span class="etq tipo-${K.tipoDe(e)}">${esc(K.tipoTxt(e))}</span>` : ""}<span class="etq">${esc(e.grupo_forza)}</span>${e.subgrupo_maduracion ? `<span class="etq">Subgrupo ${esc(e.subgrupo_maduracion)}</span>` : ""}
         <span class="etq">Inicio ${K.fechaLarga(e.fecha_inicio)}</span><span class="etq">${e.num_muestras} muestras</span></div>
         <div class="barra-prog"><div style="width:${pct}%"></div></div></div>`;
     };
@@ -129,6 +129,9 @@
           <div id="avisoBloque" class="aviso-bloque" hidden></div>
           <label class="campo"><span>Tipo de cosecha</span><div class="entrada solo-lectura" id="tipoCosecha">Se llena solo al elegir el bloque</div></label>
           <label class="campo"><span>Lote</span><input class="entrada solo-lectura" name="lote" id="inLote" readonly tabindex="-1" placeholder="Se llena solo"></label>
+          <div class="campo" style="grid-column:1/-1"><span class="lbl-mad">Estado de madurez *</span>
+            <div class="madurez" id="selMadurez">${Object.entries(K.MADUREZ).map(([n, m]) => `<button type="button" data-v="${n}" class="mad-${n === "Pintón" ? "Pinton" : n}"><b>${n}</b><small>color ${m.rango}</small></button>`).join("")}</div>
+            <input type="hidden" name="madurez" id="inMadurez"></div>
           <label class="campo"><span>Subgrupo maduración</span><input class="entrada" name="subgrupo_maduracion" placeholder="Ej: 1 - C"></label>
           <label class="campo"><span>Calibre</span><input class="entrada" name="calibre" placeholder="Ej: PE1"></label>
           <label class="campo"><span>Temperatura de almacenamiento</span><input class="entrada" name="temperatura_almacen" placeholder="Ej: 30 °C ambiente"></label>
@@ -179,9 +182,14 @@
     sg.onchange = () => { llenarBloques(); validar(); };
     sb.onchange = () => { if (!sg.value && sb.value) { sg.value = grupoDe(sb.value); llenarBloques(); } validar(); };
     llenarBloques();
+    app.querySelectorAll("#selMadurez button").forEach(b => b.onclick = () => {
+      $("#inMadurez").value = b.dataset.v;
+      app.querySelectorAll("#selMadurez button").forEach(x => x.classList.toggle("sel", x === b));
+    });
     $("#fNuevo").onsubmit = async ev => {
       ev.preventDefault();
       if (!validar()) return toast("El bloque no corresponde al grupo Forza", true);
+      if (!$("#inMadurez").value) { $("#selMadurez").scrollIntoView({ block: "center" }); return toast("Seleccione el estado de madurez: Verde, Pintón o Maduro", true); }
       const f = Object.fromEntries(new FormData(ev.target));
       Object.keys(f).forEach(k => { f[k] = String(f[k]).trim(); if (f[k] === "") f[k] = null; });
       f.num_muestras = +f.num_muestras; f.dias_ensayo = +f.dias_ensayo;
@@ -227,6 +235,7 @@
       <div class="datos-mini">
         <div>Grupo Forza<b>${esc(e.grupo_forza)}</b></div>
         <div>Tipo de cosecha<b>${esc(K.tipoTxt(e) || "—")}</b></div>
+        <div>Madurez<b>${e.madurez ? esc(K.madurezTxt(e)) : `<button class="btn btn-sec" id="btnDefMad" style="min-height:36px;padding:6px 12px;font-size:14px">Definir</button>`}</b></div>
         <div>Subgrupo<b>${esc(e.subgrupo_maduracion || "—")}</b></div>
         <div>Calibre<b>${esc(e.calibre || "—")}</b></div>
         <div>Inicio · Sem ${e.semana || "—"}<b>${K.fechaLarga(e.fecha_inicio)}</b></div>
@@ -265,6 +274,19 @@
     </div>`;
 
     app.querySelectorAll(".dia").forEach(el => el.onclick = () => { S.dia = +el.dataset.d; vistaEnsayo(); });
+    const bdm = $("#btnDefMad");
+    if (bdm) bdm.onclick = () => {
+      const h = $("#hoja");
+      h.innerHTML = `<div class="hoja-cuerpo" style="padding-bottom:30px"><div class="hoja-cab"><h2>Estado de madurez</h2><button class="x" id="cerrarH">✕</button></div>
+        <p class="suave">¿Con qué madurez inició este ensayo?</p>
+        <div class="madurez" id="selMad2">${Object.entries(K.MADUREZ).map(([n, m]) => `<button type="button" data-v="${n}" class="mad-${n === "Pintón" ? "Pinton" : n}"><b>${n}</b><small>color ${m.rango}</small></button>`).join("")}</div></div>`;
+      h.hidden = false;
+      const cerrar = () => { h.hidden = true; h.innerHTML = ""; };
+      $("#cerrarH").onclick = cerrar;
+      h.querySelectorAll("#selMad2 button").forEach(b => b.onclick = async () => {
+        await tarea("Guardando…", () => DB.actualizarEnsayo(e.id, { madurez: b.dataset.v })); await recargar(); cerrar(); toast("Madurez guardada ✓"); vistaEnsayo();
+      });
+    };
     const act = app.querySelector(".dia.activo"); act && act.scrollIntoView({ inline: "center", block: "nearest" });
     app.querySelectorAll(".muestra").forEach(el => el.onclick = () => abrirRegistro(el.dataset.id));
     $("#btnVolver").onclick = irInicio;

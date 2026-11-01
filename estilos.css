@@ -199,3 +199,18 @@ select.entrada{appearance:none;-webkit-appearance:none;background:#fff url("data
 .solo-lectura.tipo-PC,.etq.tipo-PC{background:#e3f2fd;color:#0d47a1;border-color:#90caf9}
 .solo-lectura.tipo-SC,.etq.tipo-SC{background:#f3e5f5;color:#6a1b9a;border-color:#ce93d8}
 .entrada.solo-lectura:not(:placeholder-shown){color:var(--texto);font-weight:700}
+
+/* ===== Estado de madurez ===== */
+.lbl-mad{display:block;font-size:13px;font-weight:600;color:var(--suave);margin-bottom:6px}
+.madurez{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.madurez button{border:2px solid var(--borde);background:#fff;border-radius:12px;padding:10px 6px;min-height:62px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.madurez button b{font-size:16px}
+.madurez button small{font-size:11.5px;color:var(--suave)}
+.madurez button.mad-Verde.sel{background:#4c8c3a;border-color:#2e6b22;color:#fff}
+.madurez button.mad-Pinton.sel{background:#c9d640;border-color:#9aa525;color:#2b3000}
+.madurez button.mad-Maduro.sel{background:#f6a823;border-color:#c97f00;color:#3a2400}
+.madurez button.sel small{color:inherit;opacity:.85}
+.etq.mad-Verde{background:#dff0d6;color:#2e6b22}
+.etq.mad-Pinton{background:#f2f6c8;color:#5e6600}
+.etq.mad-Maduro{background:#fde7c2;color:#8a5300}
+div.campo{display:block;margin-bottom:14px}

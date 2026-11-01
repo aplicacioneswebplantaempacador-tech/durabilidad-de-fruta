@@ -81,7 +81,7 @@
     hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [T("INFORME TÉCNICO DE CALIDAD", { bold: true, color: ARENA, size: 20, characterSpacing: 60 })] }));
     hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [T("Ensayo de Durabilidad de Fruta", { bold: true, color: NEGRO, size: 52 })] }));
     hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [T(`Piña MD2  ·  ${titulo}  ·  ${e.grupo_forza || ""}`, { size: 24, color: TEXTO })] }));
-    if (tipoTxt) hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [T(tipoTxt.toUpperCase(), { bold: true, size: 20, color: ARENA, characterSpacing: 30 })] }));
+    if (tipoTxt || e.madurez) hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [T([tipoTxt, e.madurez ? "Fruta " + k.madurezTxt(e) : ""].filter(Boolean).join("   ·   ").toUpperCase(), { bold: true, size: 20, color: ARENA, characterSpacing: 30 })] }));
     hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: ARENA, space: 1 } }, children: [] }));
 
     // Ficha del documento
@@ -125,6 +125,7 @@
     const datosE = [
       ["Fecha de inicio (Día 0)", k.fechaLarga(e.fecha_inicio)], ["Semana", e.semana ?? "—"],
       ["Bloque", e.bloque || "—"], ["Tipo de cosecha", tipoTxt || "—"],
+      ["Estado de madurez inicial", k.madurezTxt(e) || "—"], ["Color inicial promedio", k.num(A.colorIni)],
       ["Grupo Forza", e.grupo_forza], ["Lote", e.lote || "—"],
       ["Subgrupo de maduración", e.subgrupo_maduracion || "—"], ["Código del informe", codigo],
       ["Calibre", e.calibre || "—"], ["Temperatura de almacenamiento", e.temperatura_almacen || "—"],
@@ -303,7 +304,7 @@
       }]
     });
     const blob = await Packer.toBlob(doc);
-    const nombre = `Informe_Durabilidad_${String(e.bloque || e.lote || "ensayo").replace(/[^\w-]+/g, "_")}_${e.fecha_inicio}.docx`;
+    const nombre = `Informe_Durabilidad_${String(e.bloque || e.lote || "ensayo").replace(/[^\w-]+/g, "_")}${e.madurez ? "_" + e.madurez.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : ""}_${e.fecha_inicio}.docx`;
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nombre;
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
     window.__ultimoInforme = blob; // (para pruebas)

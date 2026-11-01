@@ -106,7 +106,7 @@
     // ---------------- Textos del resumen ejecutivo ----------------
     const t = [];
     const rangoIni = ms.filter(m => m.colorInicial != null).map(m => Number(m.colorInicial));
-    t.push(`El ensayo de durabilidad del bloque ${ensayo.bloque || "—"}` + (tipoDe(ensayo) ? ` (${((window.TIPOS_COSECHA || {})[tipoDe(ensayo)] || "").toLowerCase()}, ${tipoDe(ensayo)})` : "") + (ensayo.lote ? `, lote ${ensayo.lote}` : "") +
+    t.push(`El ensayo de durabilidad del bloque ${ensayo.bloque || "—"}` + (tipoDe(ensayo) ? ` (${((window.TIPOS_COSECHA || {})[tipoDe(ensayo)] || "").toLowerCase()}, ${tipoDe(ensayo)})` : "") + (ensayo.lote ? `, lote ${ensayo.lote}` : "") + (MADUREZ[ensayo.madurez] ? `, con fruta en estado ${ensayo.madurez.toLowerCase()} (color ${MADUREZ[ensayo.madurez].rango})` : "") +
       `, Grupo Forza ${ensayo.grupo_forza}, inició el ${fechaLarga(ensayo.fecha_inicio)} con ${N} muestras` +
       (colorIni != null ? ` de color inicial promedio ${num(colorIni)} (rango ${num(Math.min(...rangoIni))} a ${num(Math.max(...rangoIni))})` : "") +
       (ensayo.temperatura_almacen ? `, almacenadas a ${ensayo.temperatura_almacen}` : "") +
@@ -190,7 +190,14 @@
     const b = (window.BLOQUES || []).find(x => x[0] === e.bloque); return b ? b[1] : null;
   }
   function tipoTxt(e) { const t = tipoDe(e); return t ? `${t} · ${(window.TIPOS_COSECHA || {})[t] || ""}`.replace(/ · $/, "") : ""; }
-  function titulo(e) { return (e.bloque ? "Bloque " + e.bloque : "Lote " + (e.lote || "—")) + (e.bloque && e.lote ? " · Lote " + e.lote : ""); }
+  // Estado de madurez del ensayo (rangos de color al inicio)
+  const MADUREZ = {
+    "Verde":  { rango: "0,0 a 1,0", min: 0,   max: 1,   ref: 0.5 },
+    "Pintón": { rango: "1,5 a 2,0", min: 1.5, max: 2,   ref: 1.75 },
+    "Maduro": { rango: "2,5 a 4,0", min: 2.5, max: 4,   ref: 3.25 }
+  };
+  function madurezTxt(e) { const m = MADUREZ[e.madurez]; return m ? `${e.madurez} (color ${m.rango})` : ""; }
+  function titulo(e) { return (e.bloque ? "Bloque " + e.bloque : "Lote " + (e.lote || "—")) + (e.bloque && e.lote ? " · Lote " + e.lote : "") + (e.madurez ? " · " + e.madurez : ""); }
 
-  window.CALC = { tipoDe, tipoTxt, titulo, ESCALA, colorHex, colorRGB, textoSobre, num, fechaLarga, analizar, graficaSVG };
+  window.CALC = { MADUREZ, madurezTxt, tipoDe, tipoTxt, titulo, ESCALA, colorHex, colorRGB, textoSobre, num, fechaLarga, analizar, graficaSVG };
 })();
