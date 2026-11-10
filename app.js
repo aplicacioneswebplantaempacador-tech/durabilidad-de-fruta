@@ -132,7 +132,7 @@
           <div class="campo" style="grid-column:1/-1"><span class="lbl-mad">Estado de madurez *</span>
             <div class="madurez" id="selMadurez">${Object.entries(K.MADUREZ).map(([n, m]) => `<button type="button" data-v="${n}" class="mad-${n === "Pintón" ? "Pinton" : n}"><b>${n}</b><small>color ${m.rango}</small></button>`).join("")}</div>
             <input type="hidden" name="madurez" id="inMadurez"></div>
-          <label class="campo"><span>Subgrupo maduración</span><input class="entrada" name="subgrupo_maduracion" id="inSubgrupo" inputmode="tel" maxlength="20" placeholder="Ej: 4  o  3+4" pattern="[0-9+\-\/ ]*" title="Solo números (puede usar + o -)"></label>
+          <label class="campo"><span>Subgrupo maduración</span><input class="entrada" name="subgrupo_maduracion" id="inSubgrupo" inputmode="tel" maxlength="20" placeholder="Ej: 4  o  3+4"></label>
           <label class="campo"><span>Calibre</span><input class="entrada" name="calibre" placeholder="Ej: PE1"></label>
           <label class="campo"><span>Temperatura de almacenamiento</span><input class="entrada" name="temperatura_almacen" placeholder="Ej: 30 °C ambiente"></label>
         </div>
@@ -152,6 +152,12 @@
           <label class="campo"><span>Días de seguimiento</span><input class="entrada" type="number" name="dias_ensayo" value="${C.DIAS_ENSAYO}" min="1" max="30" required></label>
         </div>
         <p class="suave peq">Laboratorio (Brix, acidez, translucidez, temperatura) se pedirá los días ${C.DIAS_LABORATORIO.join(", ")}.</p>
+      </div>
+      <div class="tarjeta trat-card">
+        <div class="titulo-seccion" style="margin-top:0">🧪 Pileta y fungicida</div>
+        <label class="campo"><span>¿Cuántas de las primeras muestras pasan por pileta y fungicida?</span>
+          <input class="entrada" type="number" id="inTratadas" value="${C.MUESTRAS_TRATADAS ?? 5}" min="0" max="30" inputmode="numeric" required></label>
+        <p class="peq" id="txtTratadas"></p>
       </div>
       <div class="fila"><button type="button" class="btn btn-borde" id="cancelar">Cancelar</button><button class="btn btn-pri" style="flex:1">Crear ensayo</button></div>
     </form>`;
@@ -182,6 +188,14 @@
     sg.onchange = () => { llenarBloques(); validar(); };
     sb.onchange = () => { if (!sg.value && sb.value) { sg.value = grupoDe(sb.value); llenarBloques(); } validar(); };
     llenarBloques();
+    // Pileta y fungicida: las primeras N muestras
+    const itr = $("#inTratadas"), inm = app.querySelector('[name="num_muestras"]');
+    const txtTr = () => {
+      const n = +inm.value || 0, t = Math.max(0, Math.min(+itr.value || 0, n));
+      $("#txtTratadas").innerHTML = t === 0 ? "Ninguna muestra pasa por pileta (todas sin tratamiento)."
+        : `<b>Con pileta + fungicida:</b> M1${t > 1 ? " a M" + t : ""}${t < n ? `<br><b>Sin tratamiento:</b> M${t + 1}${t + 1 < n ? " a M" + n : ""}` : "<br>Todas las muestras con tratamiento."}`;
+    };
+    itr.oninput = inm.oninput = txtTr; txtTr();
     // Subgrupo: solo números y los signos + - /
     const isg = $("#inSubgrupo");
     isg.oninput = () => {
@@ -202,7 +216,8 @@
       f.semana = semanaISO(f.fecha_inicio); f.creado_por = S.auxiliar;
       f.tipo_cosecha = tipoDeB(f.bloque) || null;
       f.lote = loteDeB(f.bloque) || null;
-      const ens = await tarea("Creando ensayo…", () => DB.crearEnsayo(f));
+      const tratadas = Math.max(0, Math.min(+$("#inTratadas").value || 0, f.num_muestras));
+      const ens = await tarea("Creando ensayo…", () => DB.crearEnsayo(f, tratadas));
       toast("Ensayo creado ✓"); abrirEnsayo(ens.id);
     };
   }
@@ -241,6 +256,7 @@
       <div class="datos-mini">
         <div>Grupo Forza<b>${esc(e.grupo_forza)}</b></div>
         <div>Tipo de cosecha<b>${esc(K.tipoTxt(e) || "—")}</b></div>
+        <div>Pileta + fungicida<b>${(() => { const t = S.datos.muestras.filter(m => m.tratamiento === true).map(m => m.numero); return t.length ? (t.length > 1 ? `M${Math.min(...t)} a M${Math.max(...t)}` : "M" + t[0]) : (S.datos.muestras.some(m => m.tratamiento === false) ? "Ninguna" : "—"); })()}</b></div>
         <div>Madurez<b>${e.madurez ? esc(K.madurezTxt(e)) : `<button class="btn btn-sec" id="btnDefMad" style="min-height:36px;padding:6px 12px;font-size:14px">Definir</button>`}</b></div>
         <div>Subgrupo<b>${esc(e.subgrupo_maduracion || "—")}</b></div>
         <div>Calibre<b>${esc(e.calibre || "—")}</b></div>
@@ -319,7 +335,8 @@
     else if (nov) { cls += " novedad"; sello = `<span class="sello nov">⚠ Novedad</span>`; }
     else if (r) { cls += " hecha"; sello = `<span class="sello ok">✓ Listo</span>`; }
     const url = r && r.foto_path ? DB.urlFoto(r.foto_path) : null;
-    return `<div class="${cls}" data-id="${m.id}">${sello}
+    const trat = m.tratamiento === true ? `<span class="trat si">P+F</span>` : (m.tratamiento === false ? `<span class="trat no">Sin trat.</span>` : "");
+    return `<div class="${cls}" data-id="${m.id}">${sello}${trat}
       <div class="foto">${url !== null && r && r.foto_path ? `<img data-ruta="${esc(r.foto_path)}" src="${url}" loading="lazy" alt="">` : `<span style="font-size:30px">📷</span>${ret ? "Fuera del ensayo" : "Sin registro"}`}</div>
       <div class="info"><span class="num">M${m.numero}</span>
       ${r && r.color != null ? `<span class="burbuja" style="background:${K.colorHex(r.color)};color:${K.textoSobre(r.color)}">${K.num(r.color)}</span>` : `<span class="suave peq">${m.color_inicial != null ? "Ini " + K.num(m.color_inicial) : ""}</span>`}</div></div>`;
@@ -356,6 +373,7 @@
         <div style="text-align:center"><h2>Muestra ${m.numero}</h2><div class="suave peq">Día ${d} · ${esc(e.bloque || "Lote " + (e.lote || ""))}${K.tipoDe(e) ? " · " + K.tipoDe(e) : ""}</div></div>
         <div class="fila" style="gap:6px"><button class="nav-m" id="mSig" ${idx === muestras.length - 1 ? "disabled" : ""}>›</button><button class="x" id="cerrarH">✕</button></div>
       </div>
+      <button type="button" class="chip-trat ${m.tratamiento === true ? "si" : (m.tratamiento === false ? "no" : "")}" id="chipTrat">${m.tratamiento === true ? "🧪 Con pileta + fungicida" : (m.tratamiento === false ? "Sin pileta ni fungicida" : "Tratamiento sin definir")} <small>cambiar</small></button>
       ${retiradaAntes ? `<div class="tarjeta" style="background:var(--rojo-claro)">Esta muestra fue declarada <b>no comercial el día ${m.dia_fin_vida}</b>. Puede registrar si quiere seguir observándola, pero no es obligatorio.</div>` : ""}
 
       <div class="bloque-form"><div class="lbl">1. Foto <small>${d === 0 ? "foto inicial" : ""}</small></div>
@@ -392,6 +410,12 @@
     const cerrar = () => { hoja.hidden = true; hoja.innerHTML = ""; document.body.style.overflow = ""; };
     $("#cerrarH").onclick = () => { cerrar(); vistaEnsayo(); };
     $("#mAnt").onclick = () => abrirRegistro(muestras[idx - 1].id);
+    $("#chipTrat").onclick = async () => {
+      const nuevo = m.tratamiento !== true;
+      if (!confirm(`¿Cambiar la Muestra ${m.numero} a "${nuevo ? "Con pileta + fungicida" : "Sin tratamiento"}"?`)) return;
+      await tarea("Guardando…", () => DB.actualizarMuestra(m.id, { tratamiento: nuevo })); await recargar();
+      toast("Tratamiento actualizado ✓"); abrirRegistro(mid);
+    };
     $("#mSig").onclick = () => abrirRegistro(muestras[idx + 1].id);
 
     const tomar = async inp => {
@@ -483,9 +507,12 @@
       <div class="leyenda-escala">${K.ESCALA.map(v => `<div style="background:${K.colorHex(v)};color:${K.textoSobre(v)}">${K.num(v)}</div>`).join("")}</div>
       <p class="suave peq">⚠ = novedad ese día · ✖ = día en que se declaró no comercial</p></div>
 
+    ${A.tratamiento.con && A.tratamiento.sin ? `<div class="titulo-seccion">🧪 Comparativo: pileta + fungicida vs. sin tratamiento</div>
+    <div class="tarjeta tabla-scroll">${tablaTratHTML(A)}</div>` : ""}
+
     <div class="titulo-seccion">Durabilidad por muestra</div>
-    <div class="tarjeta tabla-scroll"><table class="simple"><tr><th>Muestra</th><th>Color ini.</th><th>Color final</th><th>Días comercial</th><th>Primera novedad</th><th>Motivo de retiro</th></tr>
-      ${A.ms.map(m => `<tr><td><b>M${m.numero}</b></td><td>${K.num(m.colorInicial)}</td><td>${K.num(m.colorFinal)}</td>
+    <div class="tarjeta tabla-scroll"><table class="simple"><tr><th>Muestra</th><th>Tratamiento</th><th>Color ini.</th><th>Color final</th><th>Días comercial</th><th>Primera novedad</th><th>Motivo de retiro</th></tr>
+      ${A.ms.map(m => `<tr><td><b>M${m.numero}</b></td><td>${m.tratada === true ? `<span class="trat-txt si">P+F</span>` : (m.tratada === false ? `<span class="trat-txt no">Sin</span>` : "—")}</td><td>${K.num(m.colorInicial)}</td><td>${K.num(m.colorFinal)}</td>
       <td>${m.retirada ? `<b style="color:var(--rojo)">${m.diaFin}</b>` : `≥ ${A.ultimoDia}`}</td>
       <td>${m.primeraNovedad ? "Día " + m.primeraNovedad.dia + ": " + esc(m.primeraNovedad.tipos.join(", ")) : "—"}</td><td>${esc(m.motivo || "—")}</td></tr>`).join("")}</table></div>
 
@@ -530,6 +557,23 @@
     if (bc) bc.onclick = async () => { if (!confirm("¿Cerrar el ensayo? Podrá reabrirlo si lo necesita.")) return; await tarea("Cerrando…", () => DB.actualizarEnsayo(e.id, { estado: "cerrado" })); toast("Ensayo cerrado"); vistaResumen(); };
     if (br) br.onclick = async () => { await tarea("Reabriendo…", () => DB.actualizarEnsayo(e.id, { estado: "activo" })); vistaResumen(); };
     window.scrollTo(0, 0);
+  }
+
+  function tablaTratHTML(A) {
+    const c = A.tratamiento.con, s = A.tratamiento.sin;
+    const f = (l, a, b, mejor) => `<tr><td>${l}</td><td class="${mejor === 1 ? "mejor" : ""}">${a}</td><td class="${mejor === -1 ? "mejor" : ""}">${b}</td></tr>`;
+    const cmp = (x, y, mayorEsMejor = true) => (x == null || y == null || Math.abs(x - y) < 0.01) ? 0 : ((x > y) === mayorEsMejor ? 1 : -1);
+    return `<table class="simple tabla-trat"><tr><th></th><th>🧪 Con pileta + fungicida</th><th>Sin tratamiento</th></tr>
+      ${f("Muestras", c.muestras, s.muestras)}
+      ${f("Comerciales al final", `${c.comerciales}/${c.n} (${K.num(c.pct, 0)} %)`, `${s.comerciales}/${s.n} (${K.num(s.pct, 0)} %)`, cmp(c.pct, s.pct))}
+      ${f("Durabilidad promedio", `${c.cota ? "≥ " : ""}${K.num(c.durabilidad)} días`, `${s.cota ? "≥ " : ""}${K.num(s.durabilidad)} días`, cmp(c.durabilidad, s.durabilidad))}
+      ${f("Retiradas (día promedio)", c.retiradas ? `${c.retiradas} (día ${K.num(c.diaRetiro)})` : "0", s.retiradas ? `${s.retiradas} (día ${K.num(s.diaRetiro)})` : "0", cmp(c.retiradas, s.retiradas, false))}
+      ${f("Color inicial → final", `${K.num(c.colorIni)} → ${K.num(c.colorFin)}`, `${K.num(s.colorIni)} → ${K.num(s.colorFin)}`)}
+      ${f("Avance de color por día", c.velocidad != null ? "+" + K.num(c.velocidad, 2) : "—", s.velocidad != null ? "+" + K.num(s.velocidad, 2) : "—", cmp(c.velocidad, s.velocidad, false))}
+      ${f("Muestras con novedad", `${c.conNovedad}/${c.n}`, `${s.conNovedad}/${s.n}`, cmp(c.conNovedad, s.conNovedad, false))}
+      ${f("Primera novedad", c.primeraNov != null ? "Día " + c.primeraNov : "Ninguna", s.primeraNov != null ? "Día " + s.primeraNov : "Ninguna", cmp(c.primeraNov ?? 99, s.primeraNov ?? 99))}
+      ${f("Novedad más frecuente", esc(c.novFrecuente || "—"), esc(s.novFrecuente || "—"))}
+    </table><p class="suave peq">En verde, el grupo con mejor resultado en cada indicador.</p>`;
   }
 
   function matrizHTML(A) {

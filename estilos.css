@@ -214,3 +214,18 @@ select.entrada{appearance:none;-webkit-appearance:none;background:#fff url("data
 .etq.mad-Pinton{background:#f2f6c8;color:#5e6600}
 .etq.mad-Maduro{background:#fde7c2;color:#8a5300}
 div.campo{display:block;margin-bottom:14px}
+
+/* ===== Pileta + fungicida ===== */
+.trat{position:absolute;top:8px;right:8px;font-size:11px;font-weight:800;padding:3px 7px;border-radius:8px;box-shadow:var(--sombra);z-index:1}
+.trat.si{background:#0d47a1;color:#fff}
+.trat.no{background:#fff;color:#607d8b}
+.chip-trat{display:flex;align-items:center;justify-content:space-between;width:100%;border:1.5px solid var(--borde);background:#fff;border-radius:12px;padding:10px 14px;font-weight:700;margin-bottom:14px;font-size:15px}
+.chip-trat.si{background:#e3f2fd;border-color:#90caf9;color:#0d47a1}
+.chip-trat.no{background:#f5f7f8;color:#546e7a}
+.chip-trat small{font-weight:600;opacity:.7;text-decoration:underline}
+.trat-card{border-left:5px solid #1565c0}
+.trat-txt{font-weight:800;font-size:12px;padding:2px 7px;border-radius:6px}
+.trat-txt.si{background:#e3f2fd;color:#0d47a1}
+.trat-txt.no{background:#eceff1;color:#546e7a}
+.tabla-trat td:first-child{font-weight:700;color:var(--suave);font-size:13px}
+.tabla-trat td.mejor{background:#e8f5e9;color:#1b5e20;font-weight:800}

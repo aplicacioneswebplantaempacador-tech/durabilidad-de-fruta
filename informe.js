@@ -126,6 +126,7 @@
       ["Fecha de inicio (Día 0)", k.fechaLarga(e.fecha_inicio)], ["Semana", e.semana ?? "—"],
       ["Bloque", e.bloque || "—"], ["Tipo de cosecha", tipoTxt || "—"],
       ["Estado de madurez inicial", k.madurezTxt(e) || "—"], ["Color inicial promedio", k.num(A.colorIni)],
+      ["Con pileta + fungicida", A.tratamiento.con ? A.tratamiento.con.muestras : "Ninguna"], ["Sin tratamiento", A.tratamiento.sin ? A.tratamiento.sin.muestras : "Ninguna"],
       ["Grupo Forza", e.grupo_forza], ["Lote", e.lote || "—"],
       ["Subgrupo de maduración", e.subgrupo_maduracion || "—"], ["Código del informe", codigo],
       ["Calibre", e.calibre || "—"], ["Temperatura de almacenamiento", e.temperatura_almacen || "—"],
@@ -174,15 +175,43 @@
     // ---------- 4. DURABILIDAD POR MUESTRA ----------
     hijos.push(H1("4. Durabilidad por muestra"));
     hijos.push(P([T("Días comercial: día del ensayo en que la auxiliar declaró la muestra como no comercial. «≥» indica que la muestra seguía comercial en el último día evaluado.", { size: 18, color: SUAVE })]));
-    const aDur = [1000, 1150, 1150, 1300, 2800, 2800];
-    hijos.push(tabla(aDur, [cabecera(["Muestra", "Color inicial", "Color final", "Días comercial", "Primera novedad", "Motivo de retiro"], aDur),
+    const aDur = [850, 1050, 1000, 1000, 1200, 2550, 2550];
+    hijos.push(tabla(aDur, [cabecera(["Muestra", "Trat.", "Color inicial", "Color final", "Días comercial", "Primera novedad", "Motivo de retiro"], aDur),
     ...A.ms.map(m => fila([
-      celda("M" + m.numero, aDur[0], { negrita: true }), celda(k.num(m.colorInicial), aDur[1], { alinear: AlignmentType.CENTER, fondo: m.colorInicial != null ? hexSin(m.colorInicial) : undefined, color: m.colorInicial != null ? txtSobre(m.colorInicial) : undefined }),
-      celda(k.num(m.colorFinal), aDur[2], { alinear: AlignmentType.CENTER, fondo: m.colorFinal != null ? hexSin(m.colorFinal) : undefined, color: m.colorFinal != null ? txtSobre(m.colorFinal) : undefined }),
-      celda(m.retirada ? String(m.diaFin) : "≥ " + A.ultimoDia, aDur[3], { alinear: AlignmentType.CENTER, negrita: true, color: m.retirada ? "C62828" : "2E7D32" }),
-      celda(m.primeraNovedad ? `Día ${m.primeraNovedad.dia}: ${m.primeraNovedad.tipos.join(", ")}` : "—", aDur[4], { tam: 18 }),
-      celda(m.motivo || "—", aDur[5], { tam: 18 })
+      celda("M" + m.numero, aDur[0], { negrita: true }),
+      celda(m.tratada === true ? "P + F" : (m.tratada === false ? "Sin" : "—"), aDur[1], { alinear: AlignmentType.CENTER, negrita: m.tratada === true, tam: 16, fondo: m.tratada === true ? "E3EEF9" : undefined, color: m.tratada === true ? "0D47A1" : SUAVE }), celda(k.num(m.colorInicial), aDur[1], { alinear: AlignmentType.CENTER, fondo: m.colorInicial != null ? hexSin(m.colorInicial) : undefined, color: m.colorInicial != null ? txtSobre(m.colorInicial) : undefined }),
+      celda(k.num(m.colorFinal), aDur[3], { alinear: AlignmentType.CENTER, fondo: m.colorFinal != null ? hexSin(m.colorFinal) : undefined, color: m.colorFinal != null ? txtSobre(m.colorFinal) : undefined }),
+      celda(m.retirada ? String(m.diaFin) : "≥ " + A.ultimoDia, aDur[4], { alinear: AlignmentType.CENTER, negrita: true, color: m.retirada ? "C62828" : "2E7D32" }),
+      celda(m.primeraNovedad ? `Día ${m.primeraNovedad.dia}: ${m.primeraNovedad.tipos.join(", ")}` : "—", aDur[5], { tam: 17 }),
+      celda(m.motivo || "—", aDur[6], { tam: 17 })
     ]))]));
+    hijos.push(P([T("P + F = la muestra pasó por pileta y fungicida · Sin = sin tratamiento", { size: 16, color: SUAVE })], { spacing: { before: 60, after: 120 } }));
+
+    // ---------- COMPARATIVO POR TRATAMIENTO ----------
+    const TC = A.tratamiento.con, TS = A.tratamiento.sin;
+    if (TC && TS) {
+      hijos.push(H1("Comparativo por tratamiento: pileta y fungicida"));
+      hijos.push(P([T(`Las muestras ${TC.muestras} pasaron por pileta y fungicida; las muestras ${TS.muestras} no recibieron tratamiento. Se resalta el grupo con mejor resultado en cada indicador.`, { size: 18, color: SUAVE })]));
+      const aT = [3600, 3300, 3300];
+      const cmp = (x, y, mayor = true) => (x == null || y == null || Math.abs(x - y) < 0.01) ? 0 : ((x > y) === mayor ? 1 : -1);
+      const filaT = (l, a, b, m = 0) => fila([
+        celda(l, aT[0], { negrita: true, tam: 17, fondo: GRIS, color: SUAVE }),
+        celda(a, aT[1], { alinear: AlignmentType.CENTER, negrita: m === 1, fondo: m === 1 ? "E3F1E1" : undefined, color: m === 1 ? "1B5E20" : undefined }),
+        celda(b, aT[2], { alinear: AlignmentType.CENTER, negrita: m === -1, fondo: m === -1 ? "E3F1E1" : undefined, color: m === -1 ? "1B5E20" : undefined })]);
+      hijos.push(tabla(aT, [cabecera(["Indicador", "Con pileta + fungicida", "Sin tratamiento"], aT),
+        filaT("Muestras", TC.muestras, TS.muestras),
+        filaT("Comerciales al final", `${TC.comerciales}/${TC.n} (${k.num(TC.pct, 0)} %)`, `${TS.comerciales}/${TS.n} (${k.num(TS.pct, 0)} %)`, cmp(TC.pct, TS.pct)),
+        filaT("Durabilidad promedio", `${TC.cota ? "≥ " : ""}${k.num(TC.durabilidad)} días`, `${TS.cota ? "≥ " : ""}${k.num(TS.durabilidad)} días`, cmp(TC.durabilidad, TS.durabilidad)),
+        filaT("Retiradas (día promedio)", TC.retiradas ? `${TC.retiradas} (día ${k.num(TC.diaRetiro)})` : "0", TS.retiradas ? `${TS.retiradas} (día ${k.num(TS.diaRetiro)})` : "0", cmp(TC.retiradas, TS.retiradas, false)),
+        filaT("Color inicial → final", `${k.num(TC.colorIni)} → ${k.num(TC.colorFin)}`, `${k.num(TS.colorIni)} → ${k.num(TS.colorFin)}`),
+        filaT("Avance de color por día", TC.velocidad != null ? "+" + k.num(TC.velocidad, 2) : "—", TS.velocidad != null ? "+" + k.num(TS.velocidad, 2) : "—", cmp(TC.velocidad, TS.velocidad, false)),
+        filaT("Muestras con novedad", `${TC.conNovedad}/${TC.n}`, `${TS.conNovedad}/${TS.n}`, cmp(TC.conNovedad, TS.conNovedad, false)),
+        filaT("Primera novedad", TC.primeraNov != null ? "Día " + TC.primeraNov : "Ninguna", TS.primeraNov != null ? "Día " + TS.primeraNov : "Ninguna", cmp(TC.primeraNov ?? 99, TS.primeraNov ?? 99)),
+        filaT("Novedad más frecuente", TC.novFrecuente || "—", TS.novFrecuente || "—")
+      ]));
+      const frase = A.textos.find(x => x.startsWith("Comparativo por tratamiento"));
+      if (frase) hijos.push(P([T("Análisis: ", { bold: true }), T(frase.replace(/^Comparativo por tratamiento:\s*/, ""))], { spacing: { before: 140, after: 120, line: 300 }, alignment: AlignmentType.JUSTIFIED }));
+    }
 
     // ---------- 5. NOVEDADES ----------
     hijos.push(H1("5. Novedades y observaciones"));
@@ -238,7 +267,7 @@
       let hechas = 0;
       for (const m of A.ms) {
         const fm = fotos.filter(f => f.m === m); if (!fm.length) continue;
-        hijos.push(H2(`Muestra ${m.numero}` + (m.retirada ? ` — no comercial desde el día ${m.diaFin}` : " — comercial hasta el final")));
+        hijos.push(H2(`Muestra ${m.numero}` + (m.tratada === true ? " · con pileta + fungicida" : (m.tratada === false ? " · sin tratamiento" : "")) + (m.retirada ? ` — no comercial desde el día ${m.diaFin}` : " — comercial hasta el final")));
         const celdas = [];
         for (const f of fm) {
           opc.progreso && opc.progreso(`Agregando fotos… ${++hechas}/${fotos.length}`);

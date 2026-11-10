@@ -25,9 +25,9 @@
       async listarEnsayos() {
         return ok(await sb.from("ensayos").select("*").neq("estado", "anulado").order("fecha_inicio", { ascending: false }).order("created_at", { ascending: false }));
       },
-      async crearEnsayo(e) {
+      async crearEnsayo(e, tratadas = 0) {
         const ens = ok(await sb.from("ensayos").insert(e).select().single());
-        const muestras = Array.from({ length: ens.num_muestras }, (_, i) => ({ ensayo_id: ens.id, numero: i + 1 }));
+        const muestras = Array.from({ length: ens.num_muestras }, (_, i) => ({ ensayo_id: ens.id, numero: i + 1, tratamiento: i < tratadas }));
         ok(await sb.from("muestras").insert(muestras));
         return ens;
       },
@@ -91,11 +91,11 @@
         return (await tabla("ensayos")).filter(e => e.estado !== "anulado")
           .sort((a, b) => (b.fecha_inicio + b.created_at).localeCompare(a.fecha_inicio + a.created_at));
       },
-      async crearEnsayo(e) {
+      async crearEnsayo(e, tratadas = 0) {
         const ens = { id: uid(), estado: "activo", created_at: ahora(), updated_at: ahora(), conclusion: null, ...e };
         const t = await tabla("ensayos"); t.push(ens); await guardarTabla("ensayos", t);
         const m = await tabla("muestras");
-        for (let i = 1; i <= ens.num_muestras; i++) m.push({ id: uid(), ensayo_id: ens.id, numero: i, color_inicial: null, dia_fin_vida: null, motivo_fin: null });
+        for (let i = 1; i <= ens.num_muestras; i++) m.push({ id: uid(), ensayo_id: ens.id, numero: i, color_inicial: null, dia_fin_vida: null, motivo_fin: null, tratamiento: i <= tratadas });
         await guardarTabla("muestras", m);
         return ens;
       },

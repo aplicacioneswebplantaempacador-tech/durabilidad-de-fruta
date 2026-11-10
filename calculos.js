@@ -41,7 +41,7 @@
       const primeraNovedad = conNov.length ? { dia: conNov[0], tipos: rs[conNov[0]].novedades } : null;
       const retirada = m.dia_fin_vida != null;
       return {
-        id: m.id, numero: m.numero, colorInicial, colorFinal, diaFinalColor, ultimoReg,
+        id: m.id, numero: m.numero, tratada: m.tratamiento === true ? true : (m.tratamiento === false ? false : null), colorInicial, colorFinal, diaFinalColor, ultimoReg,
         diaFin: m.dia_fin_vida, motivo: m.motivo_fin, retirada,
         durabilidad: retirada ? m.dia_fin_vida : ultimoDia,
         primeraNovedad, rs, diasReg
@@ -118,6 +118,45 @@
           ` (promedio de retiro: día ${num(prom(durRet))}). La durabilidad promedio del bloque es de ${nComerciales ? "al menos " : ""}${num(durabilidadProm)} días.`
         : `Todas las muestras (${N} de ${N}) se mantuvieron en condición comercial hasta el día ${ultimoDia}, por lo que la durabilidad del bloque es de al menos ${ultimoDia} días.`);
     }
+    // ---------------- Comparativo por tratamiento (pileta + fungicida) ----------------
+    const rangoTxt = nums => { const a = [...nums].sort((x, y) => x - y); if (!a.length) return ""; const out = []; let i0 = a[0], p = a[0];
+      for (const x of a.slice(1).concat([null])) { if (x === p + 1) { p = x; continue; } out.push(i0 === p ? "M" + i0 : `M${i0}–M${p}`); i0 = p = x; } return out.join(", "); };
+    const statsDe = sub => {
+      if (!sub.length) return null;
+      const ret = sub.filter(m => m.retirada), com = sub.length - ret.length;
+      const conAv = sub.filter(m => m.colorInicial != null && m.colorFinal != null && m.diaFinalColor);
+      const nov = sub.filter(m => m.primeraNovedad);
+      const cuenta = {}; sub.forEach(m => Object.values(m.rs).forEach(r => (r.novedades || []).forEach(x => { (cuenta[x] ||= new Set()).add(m.numero); })));
+      const top = Object.entries(cuenta).sort((a, b) => b[1].size - a[1].size)[0];
+      return {
+        n: sub.length, muestras: rangoTxt(sub.map(m => m.numero)), comerciales: com, pct: com / sub.length * 100,
+        retiradas: ret.length, diaRetiro: ret.length ? prom(ret.map(m => m.diaFin)) : null,
+        durabilidad: prom(sub.map(m => m.durabilidad)), cota: com > 0,
+        colorIni: prom(sub.filter(m => m.colorInicial != null).map(m => Number(m.colorInicial))),
+        colorFin: prom(sub.filter(m => m.colorFinal != null).map(m => Number(m.colorFinal))),
+        velocidad: conAv.length ? prom(conAv.map(m => (m.colorFinal - m.colorInicial) / m.diaFinalColor)) : null,
+        conNovedad: nov.length, primeraNov: nov.length ? Math.min(...nov.map(m => m.primeraNovedad.dia)) : null,
+        novFrecuente: top ? `${top[0]} (${top[1].size})` : null
+      };
+    };
+    const tratamiento = {
+      con: statsDe(ms.filter(m => m.tratada === true)),
+      sin: statsDe(ms.filter(m => m.tratada === false))
+    };
+    if (registros.length && tratamiento.con && tratamiento.sin) {
+      const c = tratamiento.con, s = tratamiento.sin;
+      let txt = `Comparativo por tratamiento: las ${c.n} muestras que pasaron por pileta y fungicida (${c.muestras}) llegaron ${c.comerciales} de ${c.n} comerciales (${num(c.pct, 0)} %), ` +
+        `con durabilidad promedio de ${c.cota ? "al menos " : ""}${num(c.durabilidad)} días; las ${s.n} muestras sin tratamiento (${s.muestras}) llegaron ${s.comerciales} de ${s.n} comerciales (${num(s.pct, 0)} %), ` +
+        `con ${s.cota ? "al menos " : ""}${num(s.durabilidad)} días.`;
+      const dDur = c.durabilidad - s.durabilidad, dPct = c.pct - s.pct;
+      if (Math.abs(dDur) < 0.05 && Math.abs(dPct) < 0.5) txt += " En durabilidad no se observó diferencia entre los dos grupos.";
+      else if (dDur >= 0 && dPct >= 0) txt += ` Resultado a favor del tratamiento con pileta y fungicida (${dDur > 0 ? "+" + num(dDur) + " días" : "misma durabilidad"}${dPct > 0 ? `, +${num(dPct, 0)} puntos de fruta comercial` : ""}).`;
+      else if (dDur <= 0 && dPct <= 0) txt += ` Las muestras sin tratamiento tuvieron mejor comportamiento (${dDur < 0 ? num(-dDur) + " días más" : "misma durabilidad"}${dPct < 0 ? `, +${num(-dPct, 0)} puntos de fruta comercial` : ""}); se recomienda revisar la aplicación en pileta.`;
+      else txt += " Los resultados entre grupos son mixtos; se recomienda repetir el ensayo para confirmar.";
+      txt += ` Novedades: ${c.conNovedad} de ${c.n} muestras con tratamiento` + (c.primeraNov != null ? ` (primera el día ${c.primeraNov})` : "") +
+        ` frente a ${s.conNovedad} de ${s.n} sin tratamiento` + (s.primeraNov != null ? ` (primera el día ${s.primeraNov})` : "") + ".";
+      t.push(txt);
+    }
     if (avance != null) {
       t.push(`El color externo avanzó de ${num(colorIni)} a ${num(colorFin)} en promedio (${avance >= 0 ? "+" : ""}${num(avance)} grados en ${diaColorFin} días, ` +
         `≈ ${num(velocidad, 2)} grados por día).` +
@@ -138,7 +177,7 @@
     if (totA) t.push(`Apariencia en el último registro de cada muestra: ${apar.Buena} buena, ${apar.Regular} regular y ${apar.Mala} mala.`);
 
     return {
-      D, dias, ultimoDia, ms, promColorPorDia, colorIni, colorFin, diaColorFin, avance, velocidad, mayorSalto,
+      tratamiento, D, dias, ultimoDia, ms, promColorPorDia, colorIni, colorFin, diaColorFin, avance, velocidad, mayorSalto,
       N, nComerciales, pctComerciales, retiradas, durabilidadProm, novedadesLista, novedadesPorTipo, primeraNov,
       apar, lab: labOrd, concepto, textos: t
     };
