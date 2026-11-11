@@ -19,6 +19,10 @@
     return {
       modo: "supabase",
       async verificarPin(pin) { return ok(await sb.rpc("verificar_pin", { p_pin: pin })) === true; },
+      async crearAuxiliar(nombre) {
+        const { error } = await sb.from("auxiliares").insert({ nombre });
+        if (error) throw new Error(/duplicate|unique/i.test(error.message) ? "Ese nombre ya existe (puede estar desactivado en Supabase)" : error.message);
+      },
       async listarAuxiliares() {
         return ok(await sb.from("auxiliares").select("nombre").eq("activo", true).order("nombre")).map(a => a.nombre);
       },
@@ -86,7 +90,12 @@
     return {
       modo: "demo",
       async verificarPin(pin) { return pin === "2026"; },
-      async listarAuxiliares() { return ["Auxiliar Demo 1", "Auxiliar Demo 2", "Auxiliar Demo 3"]; },
+      async listarAuxiliares() { const t = await tabla("auxiliares"); return (t.length ? t : ["Olier Antonio", "Sneider Cera"]).slice().sort(); },
+      async crearAuxiliar(nombre) {
+        const t = await this.listarAuxiliares();
+        if (t.some(x => x.toLowerCase() === nombre.toLowerCase())) throw new Error("Ese nombre ya existe");
+        t.push(nombre); await guardarTabla("auxiliares", t);
+      },
       async listarEnsayos() {
         return (await tabla("ensayos")).filter(e => e.estado !== "anulado")
           .sort((a, b) => (b.fecha_inicio + b.created_at).localeCompare(a.fecha_inicio + a.created_at));

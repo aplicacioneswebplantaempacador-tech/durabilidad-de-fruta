@@ -229,3 +229,11 @@ div.campo{display:block;margin-bottom:14px}
 .trat-txt.no{background:#eceff1;color:#546e7a}
 .tabla-trat td:first-child{font-weight:700;color:var(--suave);font-size:13px}
 .tabla-trat td.mejor{background:#e8f5e9;color:#1b5e20;font-weight:800}
+
+/* ===== Muestreadores ===== */
+.filtro-mu{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;-webkit-overflow-scrolling:touch}
+.filtro-mu button{flex:0 0 auto;border:1.5px solid var(--borde);background:#fff;border-radius:999px;padding:9px 14px;font-weight:700;font-size:14px;white-space:nowrap}
+.filtro-mu button small{display:inline-block;min-width:20px;margin-left:4px;padding:1px 6px;border-radius:999px;background:#eef1ea;color:var(--suave);font-size:11.5px}
+.filtro-mu button.sel{background:var(--verde2);border-color:var(--verde2);color:#fff}
+.filtro-mu button.sel small{background:rgba(255,255,255,.25);color:#fff}
+.etq.mu{background:#fff3e0;color:#8a4500}

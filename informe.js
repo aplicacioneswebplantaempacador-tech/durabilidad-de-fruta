@@ -85,7 +85,7 @@
     hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: ARENA, space: 1 } }, children: [] }));
 
     // Ficha del documento
-    const ficha = [["Código del informe", codigo], ["Fecha de emisión", hoyTxt], ["Área", "Cosecha · Control de calidad"], ["Inicio del ensayo (Día 0)", k.fechaLarga(e.fecha_inicio)], ["Estado del ensayo", e.estado === "cerrado" ? "Cerrado" : `En curso (día ${A.ultimoDia} de ${e.dias_ensayo})`]];
+    const ficha = [["Código del informe", codigo], ["Fecha de emisión", hoyTxt], ["Área", "Cosecha · Control de calidad"], ["Muestreador responsable", e.muestreador || "—"], ["Inicio del ensayo (Día 0)", k.fechaLarga(e.fecha_inicio)], ["Estado del ensayo", e.estado === "cerrado" ? "Cerrado" : `En curso (día ${A.ultimoDia} de ${e.dias_ensayo})`]];
     const aFi = [3400, 6800];
     hijos.push(tabla(aFi, ficha.map(([a1, b1], i) => fila([
       celda(a1.toUpperCase(), aFi[0], { fondo: i % 2 ? "FFFFFF" : GRIS, color: SUAVE, negrita: true, tam: 15, bordes: { ...sinBordes, bottom: { style: BorderStyle.SINGLE, size: 4, color: BORDE } } }),
@@ -132,7 +132,7 @@
       ["Calibre", e.calibre || "—"], ["Temperatura de almacenamiento", e.temperatura_almacen || "—"],
       ["Aplicación con", e.aplicacion || "No aplica"], ["Dosis", e.dosis || "—"],
       ["Número de muestras", e.num_muestras], ["Días programados / evaluados", `${e.dias_ensayo} / ${A.ultimoDia}`],
-      ["Estado", e.estado === "cerrado" ? "Cerrado" : "En curso"], ["Auxiliares que registraron", [...new Set(datos.registros.map(r => r.auxiliar).filter(Boolean))].join(", ") || "—"]
+      ["Muestreador responsable", e.muestreador || "—"], ["Estado", e.estado === "cerrado" ? "Cerrado" : "En curso"], ["Auxiliares que registraron", [...new Set(datos.registros.map(r => r.auxiliar).filter(Boolean))].join(", ") || "—"]
     ];
     const a4 = [2300, 2800, 2300, 2800];
     const filasD = [];
@@ -249,7 +249,7 @@
     const aF = [4800, 600, 4800];
     const linea = { ...sinBordes, top: { style: BorderStyle.SINGLE, size: 6, color: "333333" } };
     hijos.push(tabla(aF, [fila([
-      celda([P([T("Elaboró", { bold: true, size: 18 })], { spacing: { after: 0 } }), P([T("Auxiliar de calidad", { size: 16, color: SUAVE })], { spacing: { after: 0 } })], aF[0], { bordes: linea }),
+      celda([P([T("Elaboró", { bold: true, size: 18 })], { spacing: { after: 0 } }), P([T(e.muestreador ? e.muestreador + " · Muestreador" : "Auxiliar de calidad", { size: 16, color: SUAVE })], { spacing: { after: 0 } })], aF[0], { bordes: linea }),
       celda("", aF[1], { bordes: sinBordes }),
       celda([P([T("Revisó y aprobó", { bold: true, size: 18 })], { spacing: { after: 0 } }), P([T("Líder de cosecha", { size: 16, color: SUAVE })], { spacing: { after: 0 } })], aF[2], { bordes: linea })])]));
 

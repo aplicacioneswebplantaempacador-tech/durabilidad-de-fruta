@@ -72,17 +72,38 @@
   }
 
   // ---------------- AUXILIAR ----------------
+  const capitalizar = t => t.trim().replace(/\s+/g, " ").toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+
   async function vistaAuxiliar() {
     app.innerHTML = `<div class="tarjeta" style="max-width:460px;margin:20px auto;text-align:left"><img src="icono-192.png" alt="" style="width:64px;height:64px;border-radius:16px;float:right;margin-left:10px"><h2>¿Quién registra hoy?</h2>
-      <p class="suave">Seleccione su nombre. Quedará en cada dato y foto que tome hoy.</p><div class="lista-aux" id="listaAux"><p class="suave">Cargando…</p></div></div>`;
-    let lista = [];
-    try { lista = await DB.listarAuxiliares(); } catch (e) { toast(e.message, true); }
-    $("#listaAux").innerHTML = lista.length ? lista.map(n => `<button data-n="${esc(n)}">${esc(n)}</button>`).join("")
-      : `<p class="suave">No hay auxiliares registrados. Pídale al líder que los agregue en Supabase.</p>`;
-    $("#listaAux").querySelectorAll("button").forEach(b => b.onclick = () => {
-      ls.set("auxiliar", { nombre: b.dataset.n, fecha: hoyISO() }); ponerAuxiliar(b.dataset.n);
-      S.ensayoId ? abrirEnsayo(S.ensayoId) : irInicio();
-    });
+      <p class="suave">Seleccione su nombre. Quedará en cada dato y foto que tome hoy, y verá primero sus ensayos.</p><div class="lista-aux" id="listaAux"><p class="suave">Cargando…</p></div>
+      <button class="btn btn-borde btn-bloque" id="btnNuevoAux" style="margin-top:4px">＋ Crear muestreador</button>
+      <form id="fAux" hidden style="margin-top:12px">
+        <label class="campo"><span>Nombre y apellido del muestreador</span><input class="entrada" id="inAux" maxlength="40" autocomplete="off" placeholder="Ej: María Pérez"></label>
+        <div class="fila"><button type="button" class="btn btn-borde" id="cancAux">Cancelar</button><button class="btn btn-pri" style="flex:1">Guardar muestreador</button></div>
+      </form></div>`;
+    const pintar = async () => {
+      let lista = [];
+      try { lista = await DB.listarAuxiliares(); } catch (e) { toast(e.message, true); }
+      $("#listaAux").innerHTML = lista.length ? lista.map(n => `<button data-n="${esc(n)}">${esc(n)}</button>`).join("")
+        : `<p class="suave">Aún no hay muestreadores. Toque <b>Crear muestreador</b>.</p>`;
+      $("#listaAux").querySelectorAll("button").forEach(b => b.onclick = () => {
+        ls.set("auxiliar", { nombre: b.dataset.n, fecha: hoyISO() }); ponerAuxiliar(b.dataset.n);
+        S.filtro = b.dataset.n;
+        S.ensayoId ? abrirEnsayo(S.ensayoId) : irInicio();
+      });
+    };
+    await pintar();
+    $("#btnNuevoAux").onclick = () => { $("#fAux").hidden = false; $("#btnNuevoAux").hidden = true; $("#inAux").focus(); };
+    $("#cancAux").onclick = () => { $("#fAux").hidden = true; $("#btnNuevoAux").hidden = false; };
+    $("#inAux").oninput = ev => { ev.target.value = ev.target.value.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]/g, ""); };
+    $("#fAux").onsubmit = async ev => {
+      ev.preventDefault();
+      const n = capitalizar($("#inAux").value);
+      if (n.length < 3 || !n.includes(" ")) return toast("Escriba nombre y apellido", true);
+      try { await tarea("Guardando…", () => DB.crearAuxiliar(n)); } catch { return; }
+      toast(`${n} creado ✓`); $("#fAux").hidden = true; $("#btnNuevoAux").hidden = false; $("#inAux").value = ""; await pintar();
+    };
   }
 
   // ---------------- INICIO: lista de ensayos ----------------
@@ -91,8 +112,14 @@
     app.innerHTML = `<div class="fila entre"><h2>Ensayos</h2></div><div id="lista"><p class="suave">Cargando…</p></div>
       <button class="btn btn-pri btn-flotante" id="btnNuevo">＋ Nuevo ensayo</button>`;
     $("#btnNuevo").onclick = vistaNuevo;
-    let ens = [];
-    try { ens = await DB.listarEnsayos(); } catch (e) { toast(e.message, true); }
+    let todos = [];
+    try { todos = await DB.listarEnsayos(); } catch (e) { toast(e.message, true); }
+    const nombres = [...new Set(todos.map(e => e.muestreador).filter(Boolean))].sort();
+    if (S.filtro === undefined) S.filtro = S.auxiliar;
+    const f = (S.filtro === "__todos" || (S.filtro === "__sin" && todos.some(e => !e.muestreador)) || nombres.includes(S.filtro)) ? S.filtro : "__todos";
+    const cuenta = n => todos.filter(e => n === "__todos" || (n === "__sin" ? !e.muestreador : e.muestreador === n)).length;
+    const chips = ["__todos", ...nombres, ...(todos.some(e => !e.muestreador) ? ["__sin"] : [])];
+    const ens = todos.filter(e => f === "__todos" || (f === "__sin" ? !e.muestreador : e.muestreador === f));
     const activos = ens.filter(e => e.estado === "activo"), cerrados = ens.filter(e => e.estado === "cerrado");
     const item = e => {
       const dia = Math.max(0, Math.min(e.dias_ensayo, difDias(e.fecha_inicio, hoyISO())));
@@ -100,14 +127,16 @@
       return `<div class="tarjeta ensayo-item" data-id="${e.id}">
         <div class="fila entre"><h3>${esc(K.titulo(e))}</h3>
         <span class="etq ${e.estado === "activo" ? "verde" : "gris"}">${e.estado === "activo" ? "Día " + dia + " de " + e.dias_ensayo : "Cerrado"}</span></div>
-        <div class="etiquetas">${e.madurez ? `<span class="etq mad-${e.madurez === "Pintón" ? "Pinton" : e.madurez}">${esc(e.madurez)}</span>` : ""}${K.tipoDe(e) ? `<span class="etq tipo-${K.tipoDe(e)}">${esc(K.tipoTxt(e))}</span>` : ""}<span class="etq">${esc(e.grupo_forza)}</span>${e.subgrupo_maduracion ? `<span class="etq">Subgrupo ${esc(e.subgrupo_maduracion)}</span>` : ""}
+        <div class="etiquetas">${e.madurez ? `<span class="etq mad-${e.madurez === "Pintón" ? "Pinton" : e.madurez}">${esc(e.madurez)}</span>` : ""}${K.tipoDe(e) ? `<span class="etq tipo-${K.tipoDe(e)}">${esc(K.tipoTxt(e))}</span>` : ""}<span class="etq">${esc(e.grupo_forza)}</span>${e.muestreador ? `<span class="etq mu">👤 ${esc(e.muestreador)}</span>` : ""}${e.subgrupo_maduracion ? `<span class="etq">Subgrupo ${esc(e.subgrupo_maduracion)}</span>` : ""}
         <span class="etq">Inicio ${K.fechaLarga(e.fecha_inicio)}</span><span class="etq">${e.num_muestras} muestras</span></div>
         <div class="barra-prog"><div style="width:${pct}%"></div></div></div>`;
     };
-    $("#lista").innerHTML = (!ens.length ? `<div class="vacio"><img src="icono-192.png" alt="" style="width:84px;height:84px;border-radius:20px;box-shadow:0 6px 18px rgba(27,94,32,.25)"><p>Aún no hay ensayos.<br>Toque <b>Nuevo ensayo</b> para empezar.</p></div>` : "") +
+    const filtroHTML = todos.length ? `<div class="filtro-mu">${chips.map(n => `<button data-f="${esc(n)}" class="${n === f ? "sel" : ""}">${n === "__todos" ? "Todos" : n === "__sin" ? "Sin muestreador" : "👤 " + esc(n)} <small>${cuenta(n)}</small></button>`).join("")}</div>` : "";
+    $("#lista").innerHTML = filtroHTML + (!ens.length ? `<div class="vacio"><img src="icono-192.png" alt="" style="width:84px;height:84px;border-radius:20px;box-shadow:0 6px 18px rgba(27,94,32,.25)"><p>Aún no hay ensayos.<br>Toque <b>Nuevo ensayo</b> para empezar.</p></div>` : "") +
       (activos.length ? `<div class="titulo-seccion">En curso (${activos.length})</div>` + activos.map(item).join("") : "") +
       (cerrados.length ? `<div class="titulo-seccion">Cerrados (${cerrados.length})</div>` + cerrados.map(item).join("") : "");
     app.querySelectorAll(".ensayo-item").forEach(el => el.onclick = () => abrirEnsayo(el.dataset.id));
+    app.querySelectorAll(".filtro-mu button").forEach(b => b.onclick = () => { S.filtro = b.dataset.f; irInicio(); });
   }
 
   // ---------------- NUEVO ENSAYO ----------------
@@ -146,6 +175,7 @@
       </div>
       <div class="tarjeta">
         <div class="titulo-seccion" style="margin-top:0">Plan del ensayo</div>
+        <label class="campo"><span>Muestreador responsable *</span><select class="entrada" name="muestreador" id="selMuestreador" required><option value="">Cargando…</option></select></label>
         <div class="rejilla3">
           <label class="campo"><span>Fecha inicio (Día 0)</span><input class="entrada" type="date" name="fecha_inicio" value="${h}" required></label>
           <label class="campo"><span>N.º de muestras</span><input class="entrada" type="number" name="num_muestras" value="${C.NUM_MUESTRAS}" min="1" max="30" required></label>
@@ -162,6 +192,9 @@
       <div class="fila"><button type="button" class="btn btn-borde" id="cancelar">Cancelar</button><button class="btn btn-pri" style="flex:1">Crear ensayo</button></div>
     </form>`;
     $("#cancelar").onclick = irInicio;
+    DB.listarAuxiliares().then(l => {
+      $("#selMuestreador").innerHTML = `<option value="">Seleccione…</option>` + l.map(n => `<option ${n === S.auxiliar ? "selected" : ""}>${esc(n)}</option>`).join("");
+    }).catch(e => toast(e.message, true));
     const sg = $("#selGrupo"), sb = $("#selBloque"), av = $("#avisoBloque"), tc = $("#tipoCosecha"), btn = $("#fNuevo button.btn-pri");
     const opciones = (lista) => lista.map(b => `<option value="${b[0]}">${b[0]}  ·  ${b[1]}</option>`).join("");
     const llenarBloques = () => {
@@ -256,6 +289,7 @@
       <div class="datos-mini">
         <div>Grupo Forza<b>${esc(e.grupo_forza)}</b></div>
         <div>Tipo de cosecha<b>${esc(K.tipoTxt(e) || "—")}</b></div>
+        <div>Muestreador<b>${e.muestreador ? esc(e.muestreador) : ""} <button class="btn btn-sec" id="btnMu" style="min-height:30px;padding:3px 10px;font-size:13px">${e.muestreador ? "cambiar" : "Definir"}</button></b></div>
         <div>Pileta + fungicida<b>${(() => { const t = S.datos.muestras.filter(m => m.tratamiento === true).map(m => m.numero); return t.length ? (t.length > 1 ? `M${Math.min(...t)} a M${Math.max(...t)}` : "M" + t[0]) : (S.datos.muestras.some(m => m.tratamiento === false) ? "Ninguna" : "—"); })()}</b></div>
         <div>Madurez<b>${e.madurez ? esc(K.madurezTxt(e)) : `<button class="btn btn-sec" id="btnDefMad" style="min-height:36px;padding:6px 12px;font-size:14px">Definir</button>`}</b></div>
         <div>Subgrupo<b>${esc(e.subgrupo_maduracion || "—")}</b></div>
@@ -296,6 +330,18 @@
     </div>`;
 
     app.querySelectorAll(".dia").forEach(el => el.onclick = () => { S.dia = +el.dataset.d; vistaEnsayo(); });
+    $("#btnMu").onclick = async () => {
+      let l = []; try { l = await DB.listarAuxiliares(); } catch (er) { return toast(er.message, true); }
+      const h = $("#hoja");
+      h.innerHTML = `<div class="hoja-cuerpo" style="padding-bottom:30px"><div class="hoja-cab"><h2>Muestreador del ensayo</h2><button class="x" id="cerrarH">✕</button></div>
+        <p class="suave">¿Quién realiza este muestreo?</p><div class="lista-aux">${l.map(n => `<button data-n="${esc(n)}" ${n === e.muestreador ? 'style="border-color:var(--verde2);background:var(--verde-claro)"' : ""}>${esc(n)}</button>`).join("")}</div></div>`;
+      h.hidden = false;
+      const cerrar = () => { h.hidden = true; h.innerHTML = ""; };
+      $("#cerrarH").onclick = cerrar;
+      h.querySelectorAll(".lista-aux button").forEach(b => b.onclick = async () => {
+        await tarea("Guardando…", () => DB.actualizarEnsayo(e.id, { muestreador: b.dataset.n })); await recargar(); cerrar(); toast("Muestreador guardado ✓"); vistaEnsayo();
+      });
+    };
     const bdm = $("#btnDefMad");
     if (bdm) bdm.onclick = () => {
       const h = $("#hoja");

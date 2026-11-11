@@ -97,7 +97,7 @@
     // Concepto general
     const cfg = window.CONFIG.CONCEPTO;
     let concepto;
-    if (!registros.length) concepto = { nivel: "Sin datos", color: "#888", texto: "Aún no hay registros para emitir un concepto." };
+    if (!registros.length) concepto = { nivel: "Sin datos", color: "#888888", texto: "Aún no hay registros para emitir un concepto." };
     else if (pctComerciales >= cfg.satisfactorio) concepto = { nivel: "Durabilidad satisfactoria", color: "#2e7d32", texto: `${num(pctComerciales, 0)} % de las muestras se mantuvo en condición comercial hasta el día ${ultimoDia}.` };
     else if (pctComerciales >= cfg.intermedio) concepto = { nivel: "Durabilidad intermedia", color: "#e0a400", texto: `Solo ${num(pctComerciales, 0)} % de las muestras llegó comercial al día ${ultimoDia}; requiere seguimiento.` };
     else concepto = { nivel: "Durabilidad baja", color: "#c62828", texto: `Únicamente ${num(pctComerciales, 0)} % de las muestras llegó comercial al día ${ultimoDia}; se recomienda revisar causas.` };
