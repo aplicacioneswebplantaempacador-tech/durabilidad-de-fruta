@@ -70,8 +70,9 @@
     const codigo = `DUR-${(e.bloque || e.lote || "SB").toString().replace(/[^\w]/g, "")}-${fIni}`;
     const hoyTxt = new Date().toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
     const cabecera = (titulos, anchos) => fila(titulos.map((t, i) => celda(t, anchos[i], { fondo: NEGRO, color: "FFFFFF", negrita: true, tam: 17 })), true);
-    const hexSin = v => k.colorHex(v).slice(1).toUpperCase();
-    const txtSobre = v => k.textoSobre(v).slice(1).toUpperCase();
+    const hex6 = h => { h = String(h || "").replace("#", "").toUpperCase(); return h.length === 3 ? h.split("").map(c => c + c).join("") : h; };
+    const hexSin = v => hex6(k.colorHex(v));
+    const txtSobre = v => hex6(k.textoSobre(v));
     const espacio = () => new Paragraph({ spacing: { after: 120 }, children: [] });
 
     const hijos = [];
@@ -93,7 +94,7 @@
     hijos.push(espacio());
 
     // Concepto general
-    const colConcepto = A.concepto.color.replace("#", "").toUpperCase();
+    const colConcepto = hex6(A.concepto.color);
     hijos.push(tabla([ANCHO], [fila([new TableCell({
       width: { size: ANCHO, type: WidthType.DXA }, borders: { ...sinBordes, left: { style: BorderStyle.SINGLE, size: 48, color: colConcepto } },
       shading: { fill: ARENA_CLARA, type: ShadingType.CLEAR, color: "auto" },

@@ -16,7 +16,7 @@
   }
   const hex = rgb => "#" + rgb.map(c => c.toString(16).padStart(2, "0")).join("");
   const colorHex = v => hex(colorRGB(v));
-  const textoSobre = v => (v == null ? "#555" : (v <= 1 ? "#fff" : "#1d2a12"));
+  const textoSobre = v => (v == null ? "#555555" : (v <= 1 ? "#ffffff" : "#1d2a12"));
 
   const num = (v, d = 1) => (v == null || isNaN(v)) ? "—" : Number(v).toLocaleString("es-CO", { minimumFractionDigits: d, maximumFractionDigits: d });
   const prom = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
