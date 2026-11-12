@@ -109,9 +109,10 @@
   // ---------------- INICIO: lista de ensayos ----------------
   async function irInicio() {
     S.ensayoId = null; ls.set("ultimo_ensayo", null);
-    app.innerHTML = `<div class="fila entre"><h2>Ensayos</h2></div><div id="lista"><p class="suave">Cargando…</p></div>
+    app.innerHTML = `<div class="fila entre"><h2>Ensayos</h2><button class="btn btn-sec" id="btnComparar" style="min-height:44px;padding:8px 14px">📊 Comparar</button></div><div id="lista"><p class="suave">Cargando…</p></div>
       <button class="btn btn-pri btn-flotante" id="btnNuevo">＋ Nuevo ensayo</button>`;
     $("#btnNuevo").onclick = vistaNuevo;
+    $("#btnComparar").onclick = () => vistaComparar();
     let todos = [];
     try { todos = await DB.listarEnsayos(); } catch (e) { toast(e.message, true); }
     const nombres = [...new Set(todos.map(e => e.muestreador).filter(Boolean))].sort();
@@ -283,6 +284,7 @@
     const hechas = muestras.filter(m => regDe(m.id, d)).length, pend = muestras.filter(m => activaEnDia(m, d) && !regDe(m.id, d)).length;
 
     app.innerHTML = `
+    <button class="btn btn-borde volver-top" id="btnVolverTop">← Volver a ensayos</button>
     <div class="tarjeta cab-ensayo">
       <div class="fila entre"><h2>${esc(K.titulo(e))}</h2>
         <span class="etq ${e.estado === "activo" ? "verde" : "gris"}">${e.estado === "activo" ? "En curso" : "Cerrado"}</span></div>
@@ -358,6 +360,7 @@
     const act = app.querySelector(".dia.activo"); act && act.scrollIntoView({ inline: "center", block: "nearest" });
     app.querySelectorAll(".muestra").forEach(el => el.onclick = () => abrirRegistro(el.dataset.id));
     $("#btnVolver").onclick = irInicio;
+    $("#btnVolverTop").onclick = irInicio;
     $("#btnResumen").onclick = vistaResumen;
     const fl = $("#fLab");
     if (fl) fl.onsubmit = async ev => {
@@ -651,6 +654,79 @@
     });
     h += `<tr><td class="m">Prom.</td>${A.promColorPorDia.map(p => p.n ? `<td style="background:${K.colorHex(p.prom)};color:${K.textoSobre(p.prom)};border:2px solid #1b5e20">${K.num(p.prom)}</td>` : `<td>—</td>`).join("")}</tr>`;
     return h + "</table>";
+  }
+
+  // ================= COMPARAR TRATAMIENTOS =================
+  const colorPct = p => p == null ? "#f3f4f1" : p >= 90 ? "#c8e6c9" : p >= 70 ? "#fff3c4" : p >= 50 ? "#ffe0b2" : "#ffcdd2";
+  async function vistaComparar(quien) {
+    let todos = [];
+    try { todos = await tarea("Cargando ensayos…", () => DB.listarEnsayos()); } catch { return; }
+    const nombres = [...new Set(todos.map(e => e.muestreador).filter(Boolean))].sort();
+    if (quien === undefined) quien = S.compQuien ?? (nombres.includes(S.auxiliar) ? S.auxiliar : nombres[0] || "__todos");
+    S.compQuien = quien;
+    const lista = todos.filter(e => quien === "__todos" || e.muestreador === quien);
+    const ord = { Verde: 1, "Pintón": 2, Maduro: 3 };
+    lista.sort((a, b) => (a.subgrupo_maduracion || "").localeCompare(b.subgrupo_maduracion || "", "es", { numeric: true }) || (ord[a.madurez] || 9) - (ord[b.madurez] || 9));
+    app.innerHTML = `<button class="btn btn-borde volver-top" id="cVolver">← Volver a ensayos</button>
+      <h2 style="margin-bottom:6px">📊 Comparar tratamientos</h2>
+      <p class="suave" style="margin-top:0">Escoja quién hizo los ensayos y marque los que quiere comparar. Se agrupan por <b>subgrupo</b> (tratamiento).</p>
+      <div class="filtro-mu">${[...nombres, "__todos"].map(n => `<button data-q="${esc(n)}" class="${n === quien ? "sel" : ""}">${n === "__todos" ? "Todos" : "👤 " + esc(n)}</button>`).join("")}</div>
+      <div class="tarjeta">
+        ${lista.length ? `<label class="chk-todos"><input type="checkbox" id="cTodos" checked> <b>Seleccionar todos</b> <span class="suave">(${lista.length})</span></label>
+        <div class="lista-comp">${lista.map(e => `<label class="item-comp"><input type="checkbox" value="${e.id}" checked>
+          <div><b>${esc(K.titulo(e))}</b><div class="etiquetas" style="margin-top:4px">
+            <span class="etq ${e.subgrupo_maduracion ? "verde" : "rojo"}">${e.subgrupo_maduracion ? "Subgrupo " + esc(e.subgrupo_maduracion) : "Sin subgrupo"}</span>
+            ${e.aplicacion || e.dosis ? `<span class="etq">${esc(((e.aplicacion || "") + " " + (e.dosis || "")).trim())}</span>` : ""}
+            <span class="etq ${e.estado === "cerrado" ? "gris" : ""}">${e.estado === "cerrado" ? "Cerrado" : "En curso"}</span></div></div></label>`).join("")}</div>`
+        : `<p class="suave">No hay ensayos de esta persona.</p>`}
+      </div>
+      ${lista.length ? `<button class="btn btn-pri btn-flotante" id="cIr">Comparar ensayos seleccionados</button>` : ""}`;
+    $("#cVolver").onclick = irInicio;
+    app.querySelectorAll(".filtro-mu button").forEach(b => b.onclick = () => vistaComparar(b.dataset.q));
+    const t = $("#cTodos");
+    if (t) t.onchange = () => app.querySelectorAll(".item-comp input").forEach(i => i.checked = t.checked);
+    const ir = $("#cIr");
+    if (ir) ir.onclick = async () => {
+      const ids = [...app.querySelectorAll(".item-comp input:checked")].map(i => i.value);
+      if (ids.length < 2) return toast("Marque al menos 2 ensayos", true);
+      let datos;
+      try { datos = await tarea("Calculando comparativo…", () => Promise.all(ids.map(id => DB.obtenerEnsayo(id)))); } catch { return; }
+      S.comp = { R: K.comparar(datos), quien };
+      vistaComparativo();
+    };
+  }
+
+  function vistaComparativo() {
+    const { R, quien } = S.comp, G = R.grupos, W = G[0];
+    const celda = (c, n) => n ? `<td style="background:${colorPct(c / n * 100)}"><b>${c}/${n}</b><br><small>${K.num(c / n * 100, 0)} %</small></td>` : `<td class="suave">—</td>`;
+    app.innerHTML = `<button class="btn btn-borde volver-top" id="cVolver">← Cambiar selección</button>
+      <div class="tarjeta"><h2>Comparativo de tratamientos</h2>
+        <div class="datos-mini"><div>Muestreador<b>${quien === "__todos" ? "Todos" : esc(quien)}</b></div><div>Ensayos<b>${R.ensayos.length}</b></div>
+        <div>Tratamientos<b>${G.length}</b></div><div>Comparado al día<b>${R.Dc}</b></div></div></div>
+      ${G.length > 1 ? `<div class="ganador"><div class="peq">🏆 MEJOR TRATAMIENTO</div><h3>${esc(W.clave)}${W.aplicacion ? " · " + esc(W.aplicacion) : ""}</h3>
+        <div>${W.com} de ${W.n} frutas comerciales (${K.num(W.pct, 0)} %)${W.primeraPerdida == null ? " · sin pérdidas" : " · primera pérdida día " + W.primeraPerdida}</div></div>` : ""}
+      <div class="titulo-seccion">Frutas comerciales al día ${R.Dc}</div>
+      <div class="tarjeta tabla-scroll"><table class="tabla-comp">
+        <tr><th>Tratamiento</th>${R.madureces.map(m => `<th>${m}</th>`).join("")}<th>Total</th><th>1.ª pérdida</th><th>Durab. prom.</th><th>Avance color</th></tr>
+        ${G.map((g, i) => `<tr class="${i === 0 && G.length > 1 ? "top" : ""}"><td class="tn">${i === 0 && G.length > 1 ? "🏆 " : ""}<b>${esc(g.clave)}</b><br><small>${esc(g.aplicacion || "")}</small></td>
+          ${R.madureces.map(m => g.porMad[m] ? celda(g.porMad[m].com, g.porMad[m].n) : `<td class="suave">—</td>`).join("")}
+          ${celda(g.com, g.n)}<td>${g.primeraPerdida == null ? "Ninguna" : "Día " + g.primeraPerdida}</td><td>${K.num(g.durabilidad)} d</td><td>${g.avance != null ? "+" + K.num(g.avance) : "—"}</td></tr>`).join("")}
+      </table><p class="suave peq">Verde ≥ 90 % · amarillo 70–89 % · naranja 50–69 % · rojo &lt; 50 %. Avance de color: menor = madura más despacio.</p></div>
+      ${R.pile.con.n && R.pile.sin.n ? `<div class="titulo-seccion">🧪 Pileta y fungicida (todos los tratamientos)</div>
+      <div class="tarjeta"><table class="simple"><tr><th></th><th>Comerciales</th></tr>
+        <tr><td>Con pileta + fungicida</td><td><b>${R.pctTxt(R.pile.con.com, R.pile.con.n)}</b></td></tr>
+        <tr><td>Sin tratamiento</td><td><b>${R.pctTxt(R.pile.sin.com, R.pile.sin.n)}</b></td></tr></table></div>` : ""}
+      <div class="titulo-seccion">Conclusiones</div>
+      <div class="tarjeta parrafos">${R.conclusiones.map(t => `<p>${esc(t)}</p>`).join("")}
+        ${R.recomendaciones.length ? `<p style="margin-top:12px"><b>Recomendaciones</b></p><ul class="rec">${R.recomendaciones.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}</div>
+      <div class="titulo-seccion">Ensayos incluidos</div>
+      <div class="tarjeta peq">${R.ensayos.map(e => `<div style="padding:4px 0;border-bottom:1px solid #eef1ea">${esc(K.titulo(e))} · ${e.subgrupo_maduracion ? "Subgrupo " + esc(e.subgrupo_maduracion) : "Sin subgrupo"} · ${K.fechaLarga(e.fecha_inicio)}</div>`).join("")}</div>
+      <button class="btn btn-pri btn-flotante" id="cWord">📄 Descargar informe comparativo (Word)</button>`;
+    $("#cVolver").onclick = () => vistaComparar(quien);
+    $("#cWord").onclick = async () => {
+      try { await tarea("Preparando informe…", () => window.INFORME.generarComparativo(R, quien === "__todos" ? "Todos" : quien)); toast("Informe descargado ✓"); } catch { }
+    };
+    window.scrollTo(0, 0);
   }
 
   window.addEventListener("error", e => console.error(e));

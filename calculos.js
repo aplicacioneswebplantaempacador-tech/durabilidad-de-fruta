@@ -305,5 +305,99 @@
     return txt;
   }
 
-  window.CALC = { conclusiones, MADUREZ, madurezTxt, tipoDe, tipoTxt, titulo, ESCALA, colorHex, colorRGB, textoSobre, num, fechaLarga, analizar, graficaSVG };
+  // ---------------- COMPARATIVO ENTRE ENSAYOS (tratamientos = subgrupos) ----------------
+  // Prueba exacta de Fisher (dos colas) para 2x2: [[a,b],[c,d]]
+  function fisher(a, b, c, d) {
+    const lf = n => { let s = 0; for (let i = 2; i <= n; i++) s += Math.log(i); return s; };
+    const n = a + b + c + d, r1 = a + b, c1 = a + c, base = lf(r1) + lf(c + d) + lf(c1) + lf(b + d) - lf(n);
+    const pr = x => Math.exp(base - lf(x) - lf(r1 - x) - lf(c1 - x) - lf(c + d - c1 + x));
+    const p0 = pr(a); let p = 0;
+    for (let x = Math.max(0, c1 - (c + d)); x <= Math.min(r1, c1); x++) { const q = pr(x); if (q <= p0 * (1 + 1e-7)) p += q; }
+    return Math.min(1, p);
+  }
+  const MAD_ORDEN = ["Verde", "Pintón", "Maduro"];
+  function comparar(lista) {
+    // lista: [{ensayo, muestras, registros}]
+    const ultimo = d => d.registros.length ? Math.max(...d.registros.map(r => r.dia)) : 0;
+    const Dc = Math.min(...lista.map(ultimo));
+    const grupos = {};
+    lista.forEach(d => {
+      const e = d.ensayo;
+      const clave = e.subgrupo_maduracion ? "Subgrupo " + e.subgrupo_maduracion : ((e.aplicacion || "") + " " + (e.dosis || "")).trim() || "Sin subgrupo";
+      const g = (grupos[clave] ||= { clave, aplicaciones: new Set(), ensayos: [], porMad: {}, n: 0, com: 0, durs: [], avs: [], perdidas: [], con: { n: 0, com: 0 }, sin: { n: 0, com: 0 }, nov: 0 });
+      const ap = ((e.aplicacion || "") + " " + (e.dosis || "")).trim(); if (ap) g.aplicaciones.add(ap);
+      g.ensayos.push(e);
+      const mk = e.madurez || "Sin madurez";
+      const pm = (g.porMad[mk] ||= { n: 0, com: 0, perdidas: [] });
+      d.muestras.forEach(m => {
+        const rs = d.registros.filter(r => r.muestra_id === m.id && r.dia <= Dc).sort((x, y) => x.dia - y.dia);
+        const fin = m.dia_fin_vida != null && m.dia_fin_vida <= Dc ? m.dia_fin_vida : null;
+        const com = fin == null;
+        const cs = rs.filter(r => r.color != null);
+        g.n++; pm.n++; if (com) { g.com++; pm.com++; } else { g.perdidas.push(fin); pm.perdidas.push(fin); }
+        g.durs.push(fin == null ? Dc : fin);
+        if (com && cs.length > 1) g.avs.push(Number(cs[cs.length - 1].color) - Number(cs[0].color));
+        if (rs.some(r => (r.novedades || []).length)) g.nov++;
+        if (m.tratamiento === true) { g.con.n++; if (com) g.con.com++; }
+        if (m.tratamiento === false) { g.sin.n++; if (com) g.sin.com++; }
+      });
+    });
+    const arr = Object.values(grupos).map(g => ({
+      ...g, aplicacion: [...g.aplicaciones].join(" / "), pct: g.n ? g.com / g.n * 100 : 0,
+      durabilidad: prom(g.durs), avance: prom(g.avs), primeraPerdida: g.perdidas.length ? Math.min(...g.perdidas) : null
+    }));
+    arr.sort((a, b) => b.pct - a.pct || b.durabilidad - a.durabilidad || (a.avance ?? 9) - (b.avance ?? 9));
+    const madureces = MAD_ORDEN.filter(m => arr.some(g => g.porMad[m])).concat(arr.some(g => g.porMad["Sin madurez"]) ? ["Sin madurez"] : []);
+    const pile = { con: { n: 0, com: 0 }, sin: { n: 0, com: 0 } };
+    arr.forEach(g => { pile.con.n += g.con.n; pile.con.com += g.con.com; pile.sin.n += g.sin.n; pile.sin.com += g.sin.com; });
+    const pctTxt = (c, n) => n ? `${c}/${n} (${num(c / n * 100, 0)} %)` : "—";
+
+    // ---------------- Conclusiones ----------------
+    const out = [], rec = [];
+    const W = arr[0], L = arr[arr.length - 1];
+    const nombre = g => g.clave + (g.aplicacion ? ` (${g.aplicacion})` : "");
+    const yY = a => a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " y " + a[a.length - 1];
+    let recPileta = null;
+    if (arr.length < 2) out.push("Se necesita al menos dos tratamientos (subgrupos distintos) para comparar.");
+    else {
+      out.push(`El tratamiento con mayor durabilidad fue ${nombre(W)}: ${W.com} de ${W.n} frutas comerciales (${num(W.pct, 0)} %) al día ${Dc}` +
+        (W.primeraPerdida == null ? ", sin ninguna pérdida." : `; su primera pérdida fue el día ${W.primeraPerdida}.`));
+      const det = madureces.filter(m => W.porMad[m]).map(m => {
+        const otros = arr.slice(1).filter(g => g.porMad[m]).map(g => g.porMad[m].com / g.porMad[m].n * 100);
+        return `${m.toLowerCase()} ${W.porMad[m].com}/${W.porMad[m].n}` + (otros.length ? ` (los demás entre ${num(Math.min(...otros), 0)} y ${num(Math.max(...otros), 0)} %)` : "");
+      });
+      if (det.length) out.push(`Por madurez, ${W.clave} conservó: ${det.join("; ")}.`);
+      const claros = [], dudosos = [];
+      arr.slice(1).forEach(g => {
+        const p = fisher(W.com, W.n - W.com, g.com, g.n - g.com);
+        (p < 0.05 ? claros : dudosos).push({ g, p, dif: W.com / W.n * g.n - g.com });
+      });
+      if (claros.length) out.push(`La ventaja frente a ${yY(claros.map(x => x.g.clave))} es clara (diferencia poco probable por azar).`);
+      if (dudosos.length) out.push(`Frente a ${yY(dudosos.map(x => x.g.clave))} la ventaja aún no es concluyente; conviene repetir el ensayo para confirmarla.`);
+      if (L !== W) out.push(`El de menor desempeño fue ${nombre(L)}: ${L.com}/${L.n} comerciales (${num(L.pct, 0)} %)` + (L.primeraPerdida != null ? `, con la primera pérdida el día ${L.primeraPerdida}.` : "."));
+      const conAv = arr.filter(g => g.avance != null);
+      if (conAv.length > 1) { const lento = [...conAv].sort((a, b) => a.avance - b.avance)[0]; out.push(`Entre las frutas que siguieron comerciales, la que maduró más despacio fue la del ${lento.clave} (avance de color promedio ${num(lento.avance)}).`); }
+      // Pileta
+      if (pile.con.n && pile.sin.n) {
+        const pc = pile.con.com / pile.con.n * 100, ps = pile.sin.com / pile.sin.n * 100, p = fisher(pile.con.com, pile.con.n - pile.con.com, pile.sin.com, pile.sin.n - pile.sin.com);
+        let t = `Pileta y fungicida: con tratamiento ${pctTxt(pile.con.com, pile.con.n)} comerciales; sin tratamiento ${pctTxt(pile.sin.com, pile.sin.n)}.`;
+        if (Math.abs(pc - ps) < 5) t += " No hubo diferencia.";
+        else t += ` ${pc > ps ? "La pileta mejoró" : "La fruta sin pileta duró más"}${p < 0.05 ? "" : " (tendencia, aún no concluyente)"}.`;
+        out.push(t);
+        if (ps - pc >= 5) recPileta = ("Revisar la pileta: concentración del fungicida, frecuencia de renovación del agua y que no quede agua en corona o base.");
+      }
+      // Techo: muchos al 100 %
+      const al100 = arr.filter(g => g.pct >= 99.9).length;
+      if (al100 >= 2) out.push(`${al100} tratamientos terminaron con 100 % de fruta comercial al día ${Dc}: el ensayo no alcanzó a separarlos.`);
+      // Recomendaciones
+      rec.unshift(`Seguir aplicando ${nombre(W)}.`);
+      claros.filter(x => x.g === L || x.g.pct < W.pct - 20).forEach(x => rec.push(`Dejar de usar ${nombre(x.g)}.`));
+      if (dudosos.length) rec.push(`Repetir ${W.clave} frente a ${dudosos[0].g.clave}${madureces.includes("Maduro") ? ", sobre todo en fruta madura" : ""}, para confirmar.`);
+      if (al100 >= 2) rec.push("En los próximos ensayos, extender el seguimiento a 14–15 días.");
+      if (recPileta) rec.push(recPileta);
+    }
+    return { Dc, grupos: arr, madureces, pile, ensayos: lista.map(d => d.ensayo), conclusiones: out, recomendaciones: rec, pctTxt };
+  }
+
+  window.CALC = { comparar, fisher, conclusiones, MADUREZ, madurezTxt, tipoDe, tipoTxt, titulo, ESCALA, colorHex, colorRGB, textoSobre, num, fechaLarga, analizar, graficaSVG };
 })();

@@ -343,5 +343,110 @@
     return nombre;
   }
 
-  window.INFORME = { generar };
+  // ================= INFORME COMPARATIVO DE TRATAMIENTOS =================
+  async function generarComparativo(R, quien) {
+    const d = window.docx, k = K();
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, ImageRun, Header, Footer, PageNumber,
+      AlignmentType, HeadingLevel, WidthType, ShadingType, BorderStyle, VerticalAlign, TableLayoutType } = d;
+    const ANCHO = 10200, LG = await logo();
+    const T = (t, o = {}) => new TextRun({ text: String(t ?? ""), ...o });
+    const P = (h, o = {}) => new Paragraph({ children: Array.isArray(h) ? h : [T(h)], spacing: { after: 100 }, ...o });
+    const img = alto => new ImageRun({ data: LG.data, transformation: { width: Math.round(alto * LG.w / LG.h), height: alto } });
+    const B = { style: BorderStyle.SINGLE, size: 4, color: BORDE }, N0 = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+    const bordes = { top: B, bottom: B, left: B, right: B }, sin = { top: N0, bottom: N0, left: N0, right: N0 };
+    const celda = (txt, w, o = {}) => new TableCell({ width: { size: w, type: WidthType.DXA }, borders: o.bordes || bordes, verticalAlign: VerticalAlign.CENTER,
+      margins: { top: 60, bottom: 60, left: 90, right: 90 }, shading: o.fondo ? { fill: o.fondo, type: ShadingType.CLEAR, color: "auto" } : undefined,
+      children: (Array.isArray(txt) ? txt : [txt]).map((l, i) => new Paragraph({ alignment: o.al || AlignmentType.LEFT, spacing: { after: 0 },
+        children: [T(l, { bold: i === 0 && o.neg, size: i === 0 ? (o.tam || 19) : 15, color: i === 0 ? o.color : SUAVE })] })) });
+    const tabla = (ws, filas) => new Table({ width: { size: ANCHO, type: WidthType.DXA }, columnWidths: ws, layout: TableLayoutType.FIXED, rows: filas });
+    const fila = (c, cab) => new TableRow({ children: c, tableHeader: cab, cantSplit: true });
+    const cab = (t, ws) => fila(t.map((x, i) => celda(x, ws[i], { fondo: NEGRO, color: "FFFFFF", neg: true, tam: 16, al: i ? AlignmentType.CENTER : AlignmentType.LEFT })), true);
+    let nS = 0;
+    const H1 = t => { nS++; return new Paragraph({ heading: HeadingLevel.HEADING_1, children: [T(String(nS).padStart(2, "0") + "   ", { color: ARENA, bold: true }), T(t.toUpperCase(), { characterSpacing: 20 })] }); };
+    const fPct = p => p >= 90 ? "D7EDD8" : p >= 70 ? "FFF1C2" : p >= 50 ? "FFE0B2" : "FFCDD2";
+    const G = R.grupos, W = G[0], hoy = new Date().toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
+    const grupoF = [...new Set(R.ensayos.map(e => e.grupo_forza).filter(Boolean))].join(", ");
+    const h = [];
+
+    // Encabezado del documento
+    h.push(tabla([1500, 8700], [fila([
+      new TableCell({ width: { size: 1500, type: WidthType.DXA }, borders: sin, verticalAlign: VerticalAlign.CENTER, children: [new Paragraph({ children: [img(80)] })] }),
+      new TableCell({ width: { size: 8700, type: WidthType.DXA }, borders: sin, verticalAlign: VerticalAlign.CENTER, children: [
+        P([T("INFORME TÉCNICO DE CALIDAD", { bold: true, color: ARENA, size: 17, characterSpacing: 40 })], { spacing: { after: 20 } }),
+        P([T("Comparativo de tratamientos · Durabilidad de fruta", { bold: true, color: NEGRO, size: 34 })], { spacing: { after: 20 } }),
+        P([T(`Piña MD2 · ${grupoF || "—"} · Muestreador: ${quien} · ${hoy}`, { size: 19, color: TEXTO })], { spacing: { after: 0 } })] })])]));
+    h.push(new Paragraph({ spacing: { after: 200 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: ARENA, space: 4 } }, children: [] }));
+
+    // Ganador
+    if (G.length > 1) h.push(tabla([ANCHO], [fila([new TableCell({ width: { size: ANCHO, type: WidthType.DXA }, borders: { ...sin, left: { style: BorderStyle.SINGLE, size: 48, color: "2E7D32" } },
+      shading: { fill: ARENA_CLARA, type: ShadingType.CLEAR, color: "auto" }, margins: { top: 140, bottom: 140, left: 240, right: 200 }, children: [
+        P([T("MEJOR TRATAMIENTO", { bold: true, color: SUAVE, size: 15, characterSpacing: 30 })], { spacing: { after: 30 } }),
+        P([T(`${W.clave}${W.aplicacion ? " · " + W.aplicacion : ""}`, { bold: true, color: "2E7D32", size: 32 })], { spacing: { after: 30 } }),
+        P([T(`${W.com} de ${W.n} frutas comerciales (${k.num(W.pct, 0)} %) al día ${R.Dc}` + (W.primeraPerdida == null ? " · sin pérdidas" : ` · primera pérdida el día ${W.primeraPerdida}`), { size: 20, color: TEXTO })], { spacing: { after: 0 } })] })])]));
+
+    // Tabla principal
+    h.push(H1("Frutas comerciales por tratamiento y madurez"));
+    h.push(P([T(`${R.ensayos.length} ensayos comparados al día ${R.Dc} (último día común). Cada celda: frutas comerciales / frutas evaluadas.`, { size: 17, color: SUAVE })]));
+    const nM = R.madureces.length, wT = 2300, wR = 1000, wM = Math.floor((ANCHO - wT - wR * 4) / nM);
+    const ws = [wT, ...R.madureces.map(() => wM), wR, wR, wR, ANCHO - wT - wM * nM - wR * 3];
+    const cel = (c, n, w) => n ? celda([`${c}/${n}`, `${k.num(c / n * 100, 0)} %`], w, { al: AlignmentType.CENTER, neg: true, fondo: fPct(c / n * 100) }) : celda("—", w, { al: AlignmentType.CENTER, color: SUAVE });
+    h.push(tabla(ws, [cab(["Tratamiento", ...R.madureces, "Total", "1.ª pérdida", "Durab. prom.", "Avance color"], ws),
+      ...G.map((g, i) => fila([
+        celda([(i === 0 && G.length > 1 ? "★ " : "") + g.clave, g.aplicacion || ""], ws[0], { neg: true, fondo: i === 0 && G.length > 1 ? "E3F1E1" : GRIS }),
+        ...R.madureces.map((m, j) => g.porMad[m] ? cel(g.porMad[m].com, g.porMad[m].n, ws[1 + j]) : celda("—", ws[1 + j], { al: AlignmentType.CENTER, color: SUAVE })),
+        cel(g.com, g.n, ws[1 + nM]),
+        celda(g.primeraPerdida == null ? "Ninguna" : "Día " + g.primeraPerdida, ws[2 + nM], { al: AlignmentType.CENTER }),
+        celda(k.num(g.durabilidad) + " d", ws[3 + nM], { al: AlignmentType.CENTER }),
+        celda(g.avance != null ? "+" + k.num(g.avance) : "—", ws[4 + nM], { al: AlignmentType.CENTER })]))]));
+    h.push(P([T("Verde ≥ 90 % · amarillo 70–89 % · naranja 50–69 % · rojo < 50 %. Avance de color: menor = madura más despacio.", { size: 15, color: SUAVE })], { spacing: { before: 60, after: 100 } }));
+
+    // Pileta
+    if (R.pile.con.n && R.pile.sin.n) {
+      h.push(H1("Pileta y fungicida"));
+      const wp = [5100, 5100];
+      h.push(tabla(wp, [cab(["Grupo", "Frutas comerciales"], wp),
+        fila([celda("Con pileta + fungicida", wp[0], { neg: true, fondo: GRIS }), celda(R.pctTxt(R.pile.con.com, R.pile.con.n), wp[1], { al: AlignmentType.CENTER, neg: true })]),
+        fila([celda("Sin tratamiento", wp[0], { neg: true, fondo: GRIS }), celda(R.pctTxt(R.pile.sin.com, R.pile.sin.n), wp[1], { al: AlignmentType.CENTER, neg: true })])]));
+    }
+
+    // Conclusiones
+    h.push(H1("Conclusiones y recomendaciones"));
+    R.conclusiones.forEach((t, i) => h.push(P([T(`${i + 1}. ${t}`)], { spacing: { after: 110, line: 290 }, alignment: AlignmentType.JUSTIFIED })));
+    if (R.recomendaciones.length) {
+      h.push(P([T("Recomendaciones", { bold: true, color: NEGRO })], { spacing: { before: 140, after: 80 }, keepNext: true }));
+      R.recomendaciones.forEach(t => h.push(P([T("• " + t)], { indent: { left: 240 }, spacing: { after: 90, line: 280 } })));
+    }
+
+    // Ensayos incluidos
+    h.push(H1("Ensayos incluidos"));
+    const we = [3600, 1700, 2600, 2300];
+    h.push(tabla(we, [cab(["Ensayo", "Subgrupo", "Aplicación", "Inicio"], we),
+      ...R.ensayos.map(e => fila([celda(k.titulo(e), we[0], { tam: 17 }), celda(e.subgrupo_maduracion || "—", we[1], { al: AlignmentType.CENTER, tam: 17 }),
+        celda(((e.aplicacion || "") + " " + (e.dosis || "")).trim() || "—", we[2], { tam: 17 }), celda(k.fechaLarga(e.fecha_inicio), we[3], { tam: 17 })]))]));
+
+    // Firmas
+    h.push(new Paragraph({ spacing: { before: 600 }, children: [] }));
+    const lin = { ...sin, top: { style: BorderStyle.SINGLE, size: 6, color: "333333" } };
+    h.push(tabla([4800, 600, 4800], [fila([celda(["Elaboró", quien !== "Todos" ? quien + " · Muestreador" : "Área de calidad"], 4800, { bordes: lin, neg: true }),
+      celda("", 600, { bordes: sin }), celda(["Revisó y aprobó", "Líder de cosecha"], 4800, { bordes: lin, neg: true })])]));
+
+    const pt = { size: 15, color: SUAVE };
+    const doc = new Document({
+      creator: "Agrícola Guapa · App Durabilidad", title: "Comparativo de tratamientos",
+      styles: { default: { document: { run: { font: "Calibri", size: 20, color: TEXTO } } },
+        paragraphStyles: [{ id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true, run: { size: 24, bold: true, color: NEGRO, font: "Calibri" },
+          paragraph: { spacing: { before: 320, after: 140 }, keepNext: true, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: ARENA, space: 4 } } } }] },
+      sections: [{ properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1000, bottom: 1000, left: 1020, right: 1020, header: 450, footer: 450 } } },
+        headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [T("COMPARATIVO DE TRATAMIENTOS · AGRÍCOLA GUAPA", { bold: true, size: 15, color: SUAVE, characterSpacing: 20 })] })] }) },
+        footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [T("AGRÍCOLA GUAPA", { bold: true, size: 15, color: NEGRO, characterSpacing: 20 }), T("  ·  Piña Colombiana del Urabá  ·  Documento interno  ·  Página ", pt), new TextRun({ children: [PageNumber.CURRENT], ...pt }), T(" de ", pt), new TextRun({ children: [PageNumber.TOTAL_PAGES], ...pt })] })] }) },
+        children: h }]
+    });
+    const blob = await Packer.toBlob(doc);
+    const nombre = `Comparativo_Tratamientos_${String(quien).replace(/[^\wÁÉÍÓÚáéíóúñÑ-]+/g, "_")}_${new Date().toISOString().slice(0, 10)}.docx`;
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nombre;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    return nombre;
+  }
+
+  window.INFORME = { generar, generarComparativo };
 })();

@@ -237,3 +237,21 @@ div.campo{display:block;margin-bottom:14px}
 .filtro-mu button.sel{background:var(--verde2);border-color:var(--verde2);color:#fff}
 .filtro-mu button.sel small{background:rgba(255,255,255,.25);color:#fff}
 .etq.mu{background:#fff3e0;color:#8a4500}
+
+.volver-top{min-height:42px;padding:8px 14px;font-size:15px;margin-bottom:12px}
+
+/* ===== Comparar tratamientos ===== */
+.chk-todos{display:flex;align-items:center;gap:10px;padding:6px 2px 12px;border-bottom:1px solid var(--borde);margin-bottom:6px}
+.lista-comp{display:flex;flex-direction:column}
+.item-comp{display:flex;gap:12px;align-items:flex-start;padding:12px 2px;border-bottom:1px solid #eef1ea;cursor:pointer}
+.item-comp input,.chk-todos input{width:22px;height:22px;flex:0 0 auto;margin-top:2px;accent-color:var(--verde2)}
+.ganador{background:linear-gradient(135deg,#1b5e20,#2e7d32);color:#fff;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:var(--sombra)}
+.ganador h3{font-size:20px;margin:4px 0}
+.ganador .peq{opacity:.85;font-weight:700;letter-spacing:.05em}
+.tabla-comp{border-collapse:separate;border-spacing:3px;font-size:13px;min-width:100%}
+.tabla-comp th{font-size:11.5px;color:var(--suave);padding:4px;text-align:center}
+.tabla-comp td{text-align:center;border-radius:8px;padding:7px 6px;background:#fff}
+.tabla-comp td.tn{text-align:left;background:#f3f5f0;white-space:nowrap}
+.tabla-comp tr.top td.tn{background:#e8f5e9}
+.tabla-comp small{color:#5c6656}
+.rec{margin:4px 0 0;padding-left:20px}.rec li{margin-bottom:6px;line-height:1.45}
