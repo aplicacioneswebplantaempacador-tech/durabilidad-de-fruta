@@ -241,8 +241,10 @@
 
     // ---------- 7. CONCLUSIONES ----------
     hijos.push(H1("7. Conclusiones y recomendaciones"));
-    const concl = (e.conclusion || "").trim();
-    if (concl) concl.split(/\n+/).forEach(p => hijos.push(P([T(p)], { spacing: { after: 120, line: 300 }, alignment: AlignmentType.JUSTIFIED })));
+    const concl = (e.conclusion || k.conclusiones(A, e) || "").trim();
+    if (concl) concl.split(/\n+/).forEach(p => hijos.push(/^recomendaciones:?$/i.test(p.trim())
+      ? P([T("Recomendaciones", { bold: true, color: NEGRO })], { spacing: { before: 160, after: 80 } })
+      : P([T(p)], { spacing: { after: 120, line: 300 }, alignment: AlignmentType.JUSTIFIED, indent: p.trim().startsWith("•") ? { left: 240 } : undefined })));
     else hijos.push(P([T("(Pendiente: el responsable del ensayo debe escribir sus conclusiones en la app.)", { italics: true, color: "999999" })]));
 
     // Firmas

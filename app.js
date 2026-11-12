@@ -530,6 +530,7 @@
     await tarea("Calculando…", recargar);
     const { ensayo: e } = S.datos;
     const A = K.analizar(S.datos);
+    const autoConcl = K.conclusiones(A, e);
     const dl = diasLab(e);
     app.innerHTML = `
     <div class="fila entre" style="margin-bottom:12px"><button class="btn btn-borde" id="volverE">← Volver</button><h2 style="text-align:right">Resumen · ${esc(e.bloque || "Lote " + (e.lote || ""))}</h2></div>
@@ -574,9 +575,10 @@
     <div class="tarjeta tabla-scroll">${A.novedadesLista.length ? `<label class="peq suave" style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="checkbox" id="verTodas"> Ver también observaciones sin novedad</label><table class="simple" id="tBit"><tr><th>Día</th><th>Muestra</th><th>Novedad / observación</th><th>Registró</th></tr>
       ${A.novedadesLista.map(n => (n.tipos.length || n.noComercial ? "<tr>" : "<tr class='solo-obs' hidden>") + `<td>${n.dia}</td><td>M${n.muestra}</td><td>${n.noComercial ? "<b style='color:var(--rojo)'>NO COMERCIAL.</b> " : ""}${esc(n.tipos.join(", "))}${n.tipos.length && n.observacion ? " — " : ""}${esc(n.observacion)}</td><td class="peq">${esc(n.auxiliar)}</td></tr>`).join("")}</table>` : `<p class="suave">Sin observaciones registradas.</p>`}</div>
 
-    <div class="titulo-seccion">Conclusiones y recomendaciones (las escribe el responsable)</div>
-    <div class="tarjeta"><textarea class="entrada" id="concl" style="min-height:120px" placeholder="Ej: El lote presenta buena durabilidad para despacho a mercado nacional de hasta 7 días…">${esc(e.conclusion || "")}</textarea>
-      <button class="btn btn-sec btn-bloque" id="gConcl" style="margin-top:10px">Guardar conclusión</button></div>
+    <div class="titulo-seccion">Conclusiones y recomendaciones</div>
+    <div class="tarjeta">
+      <textarea class="entrada" id="concl" style="min-height:260px">${esc(e.conclusion || autoConcl)}</textarea>
+      <div class="fila" style="margin-top:10px"><button class="btn btn-sec" id="gConcl" style="flex:1">Guardar cambios</button>${e.conclusion ? `<button class="btn btn-borde" id="usarAuto">↺ Restablecer</button>` : ""}</div></div>
 
     <div class="titulo-seccion">Informe en Word</div>
     <div class="tarjeta">
@@ -592,10 +594,22 @@
     `;
     $("#volverE").onclick = () => vistaEnsayo();
     const vt = $("#verTodas"); if (vt) vt.onchange = () => app.querySelectorAll("#tBit .solo-obs").forEach(tr => tr.hidden = !vt.checked);
-    $("#gConcl").onclick = async () => { await tarea("Guardando…", () => DB.actualizarEnsayo(e.id, { conclusion: $("#concl").value.trim() || null })); await recargar(); toast("Conclusión guardada ✓"); };
-    $("#bWord").onclick = async () => {
+    const taC = $("#concl"); taC.style.height = Math.max(260, taC.scrollHeight + 4) + "px";
+    // Si el texto es igual al automático, no se guarda: así sigue actualizándose solo
+    const guardarConcl = async () => {
       const txt = $("#concl").value.trim();
-      if (txt !== (e.conclusion || "")) { await DB.actualizarEnsayo(e.id, { conclusion: txt || null }); await recargar(); }
+      const valor = (!txt || txt === autoConcl.trim()) ? null : txt;
+      if (valor !== (e.conclusion || null)) { await DB.actualizarEnsayo(e.id, { conclusion: valor }); await recargar(); }
+      return valor;
+    };
+    const ua = $("#usarAuto");
+    if (ua) ua.onclick = async () => {
+      if (!confirm("¿Borrar sus cambios y volver a las conclusiones originales?")) return;
+      await tarea("Guardando…", () => DB.actualizarEnsayo(e.id, { conclusion: null })); await recargar(); vistaResumen();
+    };
+    $("#gConcl").onclick = async () => { const v = await tarea("Guardando…", guardarConcl); toast(v ? "Conclusiones guardadas ✓" : "Conclusiones guardadas ✓"); vistaResumen(); };
+    $("#bWord").onclick = async () => {
+      await guardarConcl();
       await tarea("Preparando informe…", () => window.INFORME.generar(S.datos, K.analizar(S.datos), { fotos: $("#selFotos").value, urlFoto: DB.blobFoto.bind(DB), progreso: t => $("#cargandoTxt").textContent = t }));
       toast("Informe descargado ✓");
     };

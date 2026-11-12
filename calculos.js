@@ -238,5 +238,72 @@
   function madurezTxt(e) { const m = MADUREZ[e.madurez]; return m ? `${e.madurez} (color ${m.rango})` : ""; }
   function titulo(e) { return (e.bloque ? "Bloque " + e.bloque : "Lote " + (e.lote || "—")) + (e.bloque && e.lote ? " · Lote " + e.lote : "") + (e.madurez ? " · " + e.madurez : ""); }
 
-  window.CALC = { MADUREZ, madurezTxt, tipoDe, tipoTxt, titulo, ESCALA, colorHex, colorRGB, textoSobre, num, fechaLarga, analizar, graficaSVG };
+  // ---------------- Conclusiones automáticas (borrador editable) ----------------
+  function conclusiones(A, e) {
+    const out = [], rec = [];
+    const n1 = (v, d = 1) => num(v, d);
+    const enCurso = A.ultimoDia < A.D;
+    const det = [e.madurez ? "fruta " + e.madurez.toLowerCase() : "", tipoDe(e) ? ((window.TIPOS_COSECHA || {})[tipoDe(e)] || "").toLowerCase() : ""].filter(Boolean).join(", ");
+    const quien = `${e.bloque ? "El bloque " + e.bloque : "El lote " + (e.lote || "")}${det ? " (" + det + ")" : ""}`;
+    if (!A.ms.some(m => m.diasReg.length)) return "Aún no hay registros suficientes para generar conclusiones.";
+
+    // 1. Durabilidad
+    const primerRetiro = A.retiradas.length ? Math.min(...A.retiradas.map(m => m.diaFin)) : null;
+    if (!A.retiradas.length) out.push(`${quien} presentó ${A.concepto.nivel.toLowerCase()}: las ${A.N} muestras se mantuvieron comerciales hasta el día ${A.ultimoDia}, por lo que su vida comercial es de al menos ${A.ultimoDia} días.`);
+    else out.push(`${quien} presentó ${A.concepto.nivel.toLowerCase()}: ${A.nComerciales} de ${A.N} muestras (${n1(A.pctComerciales, 0)} %) llegaron comerciales al día ${A.ultimoDia}. La primera pérdida se presentó el día ${primerRetiro}, por lo que la fruta se mantuvo 100 % comercial hasta el día ${primerRetiro - 1}.`);
+
+    // 2. Color
+    if (A.avance != null) {
+      const ritmo = A.velocidad >= 0.4 ? "rápido" : A.velocidad >= 0.2 ? "moderado" : "lento";
+      out.push(`El color externo pasó de ${n1(A.colorIni)} a ${n1(A.colorFin)} en ${A.diaColorFin} días (≈ ${n1(A.velocidad, 2)} grados por día, avance ${ritmo})` +
+        (A.mayorSalto && A.mayorSalto.delta > 0 ? `; el mayor cambio se dio entre los días ${A.mayorSalto.desde} y ${A.mayorSalto.hasta}.` : "."));
+    }
+    const M = MADUREZ[e.madurez];
+    if (M && A.colorIni != null && (A.colorIni < M.min - 0.25 || A.colorIni > M.max + 0.25))
+      out.push(`El color inicial promedio (${n1(A.colorIni)}) no corresponde al rango de fruta ${e.madurez.toLowerCase()} (${M.rango}); se debe verificar la clasificación de madurez del ensayo.`);
+
+    // 3. Novedades / causas de pérdida
+    if (A.novedadesPorTipo.length) {
+      const top = A.novedadesPorTipo[0];
+      out.push(`La principal novedad fue «${top.tipo}» (${top.n} de ${A.N} muestras, desde el día ${top.primerDia})` +
+        (A.novedadesPorTipo.length > 1 ? `, seguida de ${A.novedadesPorTipo.slice(1, 3).map(x => `«${x.tipo}» (${x.n})`).join(" y ")}.` : "."));
+      const tipos = A.novedadesPorTipo.map(x => x.tipo.toLowerCase()).join(" ");
+      if (/enferma|hongo|moho|pudrici|fermento|exudado/.test(tipos)) rec.push("Reforzar el manejo sanitario en poscosecha: desinfección, cuidado de heridas en pedúnculo y base, y control de la solución de la pileta.");
+      if (/deshidrat|corona|arrugamiento/.test(tipos)) rec.push("Revisar las condiciones de almacenamiento (temperatura y humedad relativa) para reducir la deshidratación de corona y cáscara.");
+      if (/golpe|magull/.test(tipos)) rec.push("Revisar la manipulación en cosecha y transporte para disminuir golpes.");
+      if (/translucidez/.test(tipos)) rec.push("Hacer seguimiento a la translucidez en laboratorio y considerar el punto de cosecha.");
+    } else out.push("No se registraron novedades (daños o enfermedades) durante el seguimiento.");
+
+    // 4. Pileta + fungicida
+    const c = A.tratamiento && A.tratamiento.con, s = A.tratamiento && A.tratamiento.sin;
+    if (c && s) {
+      const dDur = c.durabilidad - s.durabilidad, dPct = c.pct - s.pct;
+      let t = `Pileta y fungicida: con tratamiento ${c.comerciales}/${c.n} comerciales (${n1(c.pct, 0)} %), sin tratamiento ${s.comerciales}/${s.n} (${n1(s.pct, 0)} %); novedades en ${c.conNovedad}/${c.n} frente a ${s.conNovedad}/${s.n}.`;
+      if ((dDur > 0.05 || dPct > 0.5) && dDur >= 0 && dPct >= 0) { t += " El tratamiento mejoró la durabilidad."; rec.push("Mantener el paso por pileta y fungicida; confirmar el efecto con más ensayos (cada grupo tiene pocas muestras)."); }
+      else if ((dDur < -0.05 || dPct < -0.5) && dDur <= 0 && dPct <= 0) { t += " El tratamiento no mostró beneficio en este ensayo."; rec.push("Revisar la concentración, renovación y tiempo de inmersión del fungicida en la pileta."); }
+      else t += " No hubo una diferencia clara entre los dos grupos.";
+      out.push(t);
+    }
+
+    // 5. Laboratorio
+    const L = A.lab.filter(l => l.brix != null || l.acidez != null || l.translucidez_pct != null);
+    if (L.length > 1) {
+      const a = L[0], b = L[L.length - 1], p = [];
+      if (a.brix != null && b.brix != null) p.push(`Brix de ${n1(a.brix)} a ${n1(b.brix)}`);
+      if (a.acidez != null && b.acidez != null) p.push(`acidez de ${n1(a.acidez, 2)} a ${n1(b.acidez, 2)}`);
+      if (a.translucidez_pct != null && b.translucidez_pct != null) p.push(`translucidez de ${n1(a.translucidez_pct, 0)} % a ${n1(b.translucidez_pct, 0)} %`);
+      if (p.length) out.push(`En laboratorio (día ${a.dia} al ${b.dia}): ${p.join(", ")}.`);
+    }
+
+    // Recomendación de vida comercial
+    if (primerRetiro != null) rec.unshift(`Para fruta ${e.madurez ? e.madurez.toLowerCase() + " " : ""}de este bloque, programar su comercialización antes del día ${primerRetiro} después de la cosecha.`);
+    else if (!enCurso) rec.unshift(`La fruta${e.madurez ? " " + e.madurez.toLowerCase() : ""} de este bloque soporta al menos ${A.ultimoDia} días en las condiciones del ensayo.`);
+    if (enCurso) rec.push(`Conclusión preliminar: el ensayo va en el día ${A.ultimoDia} de ${A.D}.`);
+
+    let txt = out.map((x, i) => `${i + 1}. ${x}`).join("\n");
+    if (rec.length) txt += "\nRecomendaciones:\n" + rec.map(x => "• " + x).join("\n");
+    return txt;
+  }
+
+  window.CALC = { conclusiones, MADUREZ, madurezTxt, tipoDe, tipoTxt, titulo, ESCALA, colorHex, colorRGB, textoSobre, num, fechaLarga, analizar, graficaSVG };
 })();
