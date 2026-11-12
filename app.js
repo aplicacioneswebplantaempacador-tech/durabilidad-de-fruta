@@ -719,12 +719,23 @@
       <div class="titulo-seccion">Conclusiones</div>
       <div class="tarjeta parrafos">${R.conclusiones.map(t => `<p>${esc(t)}</p>`).join("")}
         ${R.recomendaciones.length ? `<p style="margin-top:12px"><b>Recomendaciones</b></p><ul class="rec">${R.recomendaciones.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}</div>
+      ${G.some(g => Object.values(g.porMad).some(x => x.foto)) ? `<div class="titulo-seccion">📷 Así quedó la fruta (día ${R.Dc})</div>
+      <div class="tarjeta tabla-scroll"><table class="fotos-comp"><tr><th></th>${R.madureces.map(m => `<th>${m}</th>`).join("")}</tr>
+        ${G.map(g => `<tr><td class="tn"><b>${esc(g.clave)}</b><br><small>${esc(g.aplicacion || "")}</small></td>${R.madureces.map(m => {
+          const f = g.porMad[m] && g.porMad[m].foto;
+          if (!f) return `<td class="suave peq">Sin foto</td>`;
+          return `<td><div class="fc-par"><figure><img data-ruta="${esc(f.ini)}" src="${DB.urlFoto(f.ini) || ""}" loading="lazy" alt=""><figcaption>Día ${f.diaIni}</figcaption></figure>
+            <figure><img data-ruta="${esc(f.fin)}" src="${DB.urlFoto(f.fin) || ""}" loading="lazy" alt=""><figcaption>Día ${f.dia}</figcaption></figure></div>
+            <div class="peq">M${f.numero} · color ${K.num(f.colorIni)} → <b>${K.num(f.color)}</b> · <span style="color:${f.com ? "var(--verde2)" : "var(--rojo)"};font-weight:700">${f.com ? "Comercial" : "No comercial"}</span></div></td>`;
+        }).join("")}</tr>`).join("")}
+      </table><p class="suave peq">Una muestra representativa de cada ensayo (del estado que predominó y con el color más cercano al promedio): foto del inicio y del día ${R.Dc}.</p></div>` : ""}
+
       <div class="titulo-seccion">Ensayos incluidos</div>
       <div class="tarjeta peq">${R.ensayos.map(e => `<div style="padding:4px 0;border-bottom:1px solid #eef1ea">${esc(K.titulo(e))} · ${e.subgrupo_maduracion ? "Subgrupo " + esc(e.subgrupo_maduracion) : "Sin subgrupo"} · ${K.fechaLarga(e.fecha_inicio)}</div>`).join("")}</div>
       <button class="btn btn-pri btn-flotante" id="cWord">📄 Descargar informe comparativo (Word)</button>`;
     $("#cVolver").onclick = () => vistaComparar(quien);
     $("#cWord").onclick = async () => {
-      try { await tarea("Preparando informe…", () => window.INFORME.generarComparativo(R, quien === "__todos" ? "Todos" : quien)); toast("Informe descargado ✓"); } catch { }
+      try { await tarea("Preparando informe…", () => window.INFORME.generarComparativo(R, quien === "__todos" ? "Todos" : quien, { urlFoto: DB.blobFoto.bind(DB), progreso: t => $("#cargandoTxt").textContent = t })); toast("Informe descargado ✓"); } catch { }
     };
     window.scrollTo(0, 0);
   }

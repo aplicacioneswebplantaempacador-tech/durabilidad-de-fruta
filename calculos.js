@@ -329,6 +329,23 @@
       g.ensayos.push(e);
       const mk = e.madurez || "Sin madurez";
       const pm = (g.porMad[mk] ||= { n: 0, com: 0, perdidas: [] });
+      // Foto representativa: la muestra cuyo color final está más cerca de la mediana del ensayo
+      const cand = d.muestras.map(m => {
+        const rs = d.registros.filter(r => r.muestra_id === m.id && r.dia <= Dc).sort((x, y) => x.dia - y.dia);
+        const conFoto = rs.filter(r => r.foto_path);
+        if (!conFoto.length) return null;
+        const fin = conFoto[conFoto.length - 1], ini = conFoto.find(r => r.dia === 0) || conFoto[0];
+        return { numero: m.numero, ini: ini.foto_path, diaIni: ini.dia, colorIni: ini.color, fin: fin.foto_path, dia: fin.dia, color: fin.color,
+          com: !(m.dia_fin_vida != null && m.dia_fin_vida <= Dc), trat: m.tratamiento };
+      }).filter(Boolean);
+      if (cand.length && !pm.foto) {
+        const cols = cand.map(c => Number(c.color ?? 0)).sort((a, b) => a - b), med = cols[Math.floor(cols.length / 2)];
+        // Se elige del estado que predomina en el ensayo (comercial o no comercial)
+        const nCom = cand.filter(c => c.com).length, mayoria = cand.filter(c => c.com === (nCom >= cand.length / 2));
+        const pool = mayoria.length ? mayoria : cand;
+        const finales = pool.filter(c => c.dia === Math.max(...pool.map(x => x.dia)));
+        pm.foto = (finales.length ? finales : pool).sort((a, b) => Math.abs((a.color ?? 0) - med) - Math.abs((b.color ?? 0) - med) || a.numero - b.numero)[0];
+      }
       d.muestras.forEach(m => {
         const rs = d.registros.filter(r => r.muestra_id === m.id && r.dia <= Dc).sort((x, y) => x.dia - y.dia);
         const fin = m.dia_fin_vida != null && m.dia_fin_vida <= Dc ? m.dia_fin_vida : null;

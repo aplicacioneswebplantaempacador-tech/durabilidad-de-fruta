@@ -344,7 +344,7 @@
   }
 
   // ================= INFORME COMPARATIVO DE TRATAMIENTOS =================
-  async function generarComparativo(R, quien) {
+  async function generarComparativo(R, quien, opc = {}) {
     const d = window.docx, k = K();
     const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, ImageRun, Header, Footer, PageNumber,
       AlignmentType, HeadingLevel, WidthType, ShadingType, BorderStyle, VerticalAlign, TableLayoutType } = d;
@@ -415,6 +415,34 @@
     if (R.recomendaciones.length) {
       h.push(P([T("Recomendaciones", { bold: true, color: NEGRO })], { spacing: { before: 140, after: 80 }, keepNext: true }));
       R.recomendaciones.forEach(t => h.push(P([T("• " + t)], { indent: { left: 240 }, spacing: { after: 90, line: 280 } })));
+    }
+
+    // Registro fotográfico comparativo
+    const conFotos = G.some(g => Object.values(g.porMad).some(x => x.foto));
+    if (conFotos && opc.urlFoto) {
+      h.push(new Paragraph({ children: [new d.PageBreak()] }));
+      h.push(H1(`Registro fotográfico · inicio vs. día ${R.Dc}`));
+      h.push(P([T(`Una muestra representativa por ensayo (del estado que predominó y con el color más cercano al promedio). Izquierda: inicio · derecha: día ${R.Dc}.`, { size: 17, color: SUAVE })]));
+      const wL = 1500, wC = Math.floor((ANCHO - wL) / R.madureces.length), fw = Math.min(118, Math.floor((wC / 1440 * 96 - 18) / 2));
+      const total = G.reduce((a, g) => a + R.madureces.filter(m => g.porMad[m] && g.porMad[m].foto).length, 0); let hechas = 0;
+      const imgDe = async ruta => { try { return await reducir(await opc.urlFoto(ruta), 700); } catch (err) { console.warn(err); return null; } };
+      const filasF = [cab(["Tratamiento", ...R.madureces], [wL, ...R.madureces.map(() => wC)])];
+      for (const g of G) {
+        const celdas = [celda([g.clave, g.aplicacion || ""], wL, { neg: true, fondo: GRIS })];
+        for (const m of R.madureces) {
+          const f = g.porMad[m] && g.porMad[m].foto;
+          if (!f) { celdas.push(celda("Sin foto", wC, { al: AlignmentType.CENTER, color: SUAVE })); continue; }
+          opc.progreso && opc.progreso(`Agregando fotos… ${++hechas}/${total}`);
+          const [a1, a2] = await Promise.all([imgDe(f.ini), imgDe(f.fin)]);
+          const run = (im) => im ? new ImageRun({ data: im.data, transformation: { width: fw, height: Math.round(fw * im.h / im.w) } }) : T("(sin foto)", { size: 14, color: SUAVE });
+          celdas.push(new TableCell({ width: { size: wC, type: WidthType.DXA }, borders: bordes, margins: { top: 60, bottom: 60, left: 40, right: 40 }, children: [
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 30 }, children: [run(a1), T("  "), run(a2)] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [T(`Día ${f.diaIni}  →  Día ${f.dia}`, { size: 14, color: SUAVE })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [T(`M${f.numero} · color ${k.num(f.colorIni)} → ${k.num(f.color)} · `, { size: 15 }), T(f.com ? "Comercial" : "No comercial", { size: 15, bold: true, color: f.com ? "2E7D32" : "C62828" })] })] }));
+        }
+        filasF.push(fila(celdas));
+      }
+      h.push(tabla([wL, ...R.madureces.map(() => wC)], filasF));
     }
 
     // Ensayos incluidos
