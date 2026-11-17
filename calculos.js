@@ -111,6 +111,14 @@
       (colorIni != null ? ` de color inicial promedio ${num(colorIni)} (rango ${num(Math.min(...rangoIni))} a ${num(Math.max(...rangoIni))})` : "") +
       (ensayo.temperatura_almacen ? `, almacenadas a ${ensayo.temperatura_almacen}` : "") +
       `. Se realizó seguimiento hasta el día ${ultimoDia}` + (ultimoDia < D ? ` de ${D} programados.` : "."));
+    if (esPDV(ensayo)) {
+      t.push(`Ensayo de punto de venta: la fruta se despachó a ${LUGARES[ensayo.origen].ciudad} (${ensayo.origen})` +
+        (ensayo.salida_fecha ? ` el ${fechaLarga(ensayo.salida_fecha)} a las ${horaTxt(ensayo.salida_hora)}` : "") +
+        (ensayo.vehiculo_tipo ? ` en ${ensayo.vehiculo_tipo.toLowerCase()}${ensayo.vehiculo_encarpado == null ? "" : ensayo.vehiculo_encarpado ? " encarpado" : " sin carpa"}` : "") +
+        (ensayo.temperatura_salida != null ? `, a ${num(ensayo.temperatura_salida)} °C` : "") +
+        (ensayo.estado_vehiculo ? `, con el vehículo en estado ${ensayo.estado_vehiculo.toLowerCase()}` : "") + "." +
+        (ensayo.llegada_fecha ? ` Llegó el ${fechaLarga(ensayo.llegada_fecha)} a las ${horaTxt(ensayo.llegada_hora)} (viaje de ${viajeTxt(ensayo)})` + (ensayo.recibido_por ? ` y la recibió ${ensayo.recibido_por}.` : ".") : " La llegada aún no se ha registrado."));
+    }
     if (registros.length) {
       t.push(retiradas.length
         ? `${nComerciales} de ${N} muestras (${num(pctComerciales, 0)} %) se mantuvieron comerciales hasta el día ${ultimoDia}. ` +
@@ -236,7 +244,18 @@
     "Maduro": { rango: "2,5 a 4,0", min: 2.5, max: 4,   ref: 3.25 }
   };
   function madurezTxt(e) { const m = MADUREZ[e.madurez]; return m ? `${e.madurez} (color ${m.rango})` : ""; }
-  function titulo(e) { return (e.bloque ? "Bloque " + e.bloque : "Lote " + (e.lote || "—")) + (e.bloque && e.lote ? " · Lote " + e.lote : "") + (e.madurez ? " · " + e.madurez : ""); }
+  // Lugar del ensayo: planta o punto de venta (la fruta viaja)
+  const LUGARES = { Planta: { nombre: "Planta", ciudad: null }, PDVM: { nombre: "PDV Medellín", ciudad: "Medellín" }, PDVS: { nombre: "PDV Sincelejo", ciudad: "Sincelejo" }, PDVC: { nombre: "PDV Cartagena", ciudad: "Cartagena" } };
+  const esPDV = e => !!(e && e.origen && e.origen !== "Planta" && LUGARES[e.origen]);
+  const lugarTxt = e => esPDV(e) ? `${e.origen} · ${LUGARES[e.origen].ciudad}` : "Planta";
+  const horaTxt = h => h ? String(h).slice(0, 5) : "—";
+  function viajeHoras(e) {
+    if (!e.salida_fecha || !e.salida_hora || !e.llegada_fecha || !e.llegada_hora) return null;
+    const a = new Date(`${e.salida_fecha}T${String(e.salida_hora).slice(0, 5)}:00`), b = new Date(`${e.llegada_fecha}T${String(e.llegada_hora).slice(0, 5)}:00`);
+    const h = (b - a) / 36e5; return isFinite(h) ? h : null;
+  }
+  const viajeTxt = e => { const h = viajeHoras(e); if (h == null) return "—"; const H = Math.floor(h), M = Math.round((h - H) * 60); return `${H} h ${String(M).padStart(2, "0")} min`; };
+  function titulo(e) { return (esPDV(e) ? e.origen + " · " : "") + (e.bloque ? "Bloque " + e.bloque : "Lote " + (e.lote || "—")) + (e.bloque && e.lote ? " · Lote " + e.lote : "") + (e.madurez ? " · " + e.madurez : ""); }
 
   // ---------------- Conclusiones automáticas (borrador editable) ----------------
   function conclusiones(A, e) {
@@ -416,5 +435,5 @@
     return { Dc, grupos: arr, madureces, pile, ensayos: lista.map(d => d.ensayo), conclusiones: out, recomendaciones: rec, pctTxt };
   }
 
-  window.CALC = { comparar, fisher, conclusiones, MADUREZ, madurezTxt, tipoDe, tipoTxt, titulo, ESCALA, colorHex, colorRGB, textoSobre, num, fechaLarga, analizar, graficaSVG };
+  window.CALC = { LUGARES, esPDV, lugarTxt, horaTxt, viajeHoras, viajeTxt, comparar, fisher, conclusiones, MADUREZ, madurezTxt, tipoDe, tipoTxt, titulo, ESCALA, colorHex, colorRGB, textoSobre, num, fechaLarga, analizar, graficaSVG };
 })();

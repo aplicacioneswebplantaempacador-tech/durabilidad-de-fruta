@@ -264,3 +264,19 @@ div.campo{display:block;margin-bottom:14px}
 .fc-par figure{margin:0;flex:1}
 .fc-par img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;background:#eef1ea;display:block}
 .fc-par figcaption{font-size:11px;color:var(--suave);font-weight:700}
+
+/* ===== Lugar del ensayo / transporte ===== */
+.lugares{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.lugares button{border:2px solid var(--borde);background:#fff;border-radius:12px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.lugares button b{font-size:16px}.lugares button small{font-size:12px;color:var(--suave)}
+.lugares button.sel{background:#e3f2fd;border-color:#1565c0;color:#0d47a1}
+.lugares button.sel small{color:#0d47a1}
+.transporte-card{border-left:5px solid #6d4c41}
+.campo-t{margin-bottom:14px}.campo-t>span{display:block;font-size:13px;font-weight:600;color:var(--suave);margin-bottom:6px}
+.seg-segVeh,.seg-segCarpa{grid-template-columns:repeat(2,1fr)}
+.segmento button.sel{background:#5d4037;border-color:#5d4037;color:#fff}
+#segEstVeh button.sel[data-v="Bueno"]{background:var(--verde2);border-color:var(--verde2)}
+#segEstVeh button.sel[data-v="Regular"]{background:var(--amarillo);border-color:var(--amarillo);color:#3a2a00}
+#segEstVeh button.sel[data-v="Malo"]{background:var(--rojo);border-color:var(--rojo)}
+.etq.pdv{background:#efebe9;color:#4e342e}
+.filtro-lugar button.sel{background:#5d4037;border-color:#5d4037}

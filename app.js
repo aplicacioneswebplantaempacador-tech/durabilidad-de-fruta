@@ -120,7 +120,9 @@
     const f = (S.filtro === "__todos" || (S.filtro === "__sin" && todos.some(e => !e.muestreador)) || nombres.includes(S.filtro)) ? S.filtro : "__todos";
     const cuenta = n => todos.filter(e => n === "__todos" || (n === "__sin" ? !e.muestreador : e.muestreador === n)).length;
     const chips = ["__todos", ...nombres, ...(todos.some(e => !e.muestreador) ? ["__sin"] : [])];
-    const ens = todos.filter(e => f === "__todos" || (f === "__sin" ? !e.muestreador : e.muestreador === f));
+    const lugares = Object.keys(K.LUGARES).filter(k => todos.some(e => (e.origen || "Planta") === k));
+    const fl = lugares.includes(S.lugar) ? S.lugar : "__todos";
+    const ens = todos.filter(e => (f === "__todos" || (f === "__sin" ? !e.muestreador : e.muestreador === f)) && (fl === "__todos" || (e.origen || "Planta") === fl));
     const activos = ens.filter(e => e.estado === "activo"), cerrados = ens.filter(e => e.estado === "cerrado");
     const item = e => {
       const dia = Math.max(0, Math.min(e.dias_ensayo, difDias(e.fecha_inicio, hoyISO())));
@@ -128,16 +130,18 @@
       return `<div class="tarjeta ensayo-item" data-id="${e.id}">
         <div class="fila entre"><h3>${esc(K.titulo(e))}</h3>
         <span class="etq ${e.estado === "activo" ? "verde" : "gris"}">${e.estado === "activo" ? "Día " + dia + " de " + e.dias_ensayo : "Cerrado"}</span></div>
-        <div class="etiquetas">${e.madurez ? `<span class="etq mad-${e.madurez === "Pintón" ? "Pinton" : e.madurez}">${esc(e.madurez)}</span>` : ""}${K.tipoDe(e) ? `<span class="etq tipo-${K.tipoDe(e)}">${esc(K.tipoTxt(e))}</span>` : ""}<span class="etq">${esc(e.grupo_forza)}</span>${e.muestreador ? `<span class="etq mu">👤 ${esc(e.muestreador)}</span>` : ""}${e.subgrupo_maduracion ? `<span class="etq">Subgrupo ${esc(e.subgrupo_maduracion)}</span>` : ""}
+        <div class="etiquetas">${K.esPDV(e) ? `<span class="etq pdv">🚚 ${esc(K.lugarTxt(e))}${e.llegada_fecha ? "" : " · en camino"}</span>` : ""}${e.madurez ? `<span class="etq mad-${e.madurez === "Pintón" ? "Pinton" : e.madurez}">${esc(e.madurez)}</span>` : ""}${K.tipoDe(e) ? `<span class="etq tipo-${K.tipoDe(e)}">${esc(K.tipoTxt(e))}</span>` : ""}<span class="etq">${esc(e.grupo_forza)}</span>${e.muestreador ? `<span class="etq mu">👤 ${esc(e.muestreador)}</span>` : ""}${e.subgrupo_maduracion ? `<span class="etq">Subgrupo ${esc(e.subgrupo_maduracion)}</span>` : ""}
         <span class="etq">Inicio ${K.fechaLarga(e.fecha_inicio)}</span><span class="etq">${e.num_muestras} muestras</span></div>
         <div class="barra-prog"><div style="width:${pct}%"></div></div></div>`;
     };
     const filtroHTML = todos.length ? `<div class="filtro-mu">${chips.map(n => `<button data-f="${esc(n)}" class="${n === f ? "sel" : ""}">${n === "__todos" ? "Todos" : n === "__sin" ? "Sin muestreador" : "👤 " + esc(n)} <small>${cuenta(n)}</small></button>`).join("")}</div>` : "";
-    $("#lista").innerHTML = filtroHTML + (!ens.length ? `<div class="vacio"><img src="icono-192.png" alt="" style="width:84px;height:84px;border-radius:20px;box-shadow:0 6px 18px rgba(27,94,32,.25)"><p>Aún no hay ensayos.<br>Toque <b>Nuevo ensayo</b> para empezar.</p></div>` : "") +
+    const filtroLugar = lugares.length > 1 ? `<div class="filtro-mu filtro-lugar">${["__todos", ...lugares].map(n => `<button data-l="${n}" class="${n === fl ? "sel" : ""}">${n === "__todos" ? "📍 Todos los lugares" : n === "Planta" ? "🏭 Planta" : "🚚 " + n + " · " + K.LUGARES[n].ciudad}</button>`).join("")}</div>` : "";
+    $("#lista").innerHTML = filtroLugar + filtroHTML + (!ens.length ? `<div class="vacio"><img src="icono-192.png" alt="" style="width:84px;height:84px;border-radius:20px;box-shadow:0 6px 18px rgba(27,94,32,.25)"><p>Aún no hay ensayos.<br>Toque <b>Nuevo ensayo</b> para empezar.</p></div>` : "") +
       (activos.length ? `<div class="titulo-seccion">En curso (${activos.length})</div>` + activos.map(item).join("") : "") +
       (cerrados.length ? `<div class="titulo-seccion">Cerrados (${cerrados.length})</div>` + cerrados.map(item).join("") : "");
     app.querySelectorAll(".ensayo-item").forEach(el => el.onclick = () => abrirEnsayo(el.dataset.id));
-    app.querySelectorAll(".filtro-mu button").forEach(b => b.onclick = () => { S.filtro = b.dataset.f; irInicio(); });
+    app.querySelectorAll(".filtro-mu:not(.filtro-lugar) button").forEach(b => b.onclick = () => { S.filtro = b.dataset.f; irInicio(); });
+    app.querySelectorAll(".filtro-lugar button").forEach(b => b.onclick = () => { S.lugar = b.dataset.l; irInicio(); });
   }
 
   // ---------------- NUEVO ENSAYO ----------------
@@ -151,6 +155,25 @@
     const loteDeB = b => { const m = /^[A-Z]{2}(\d{2})\d{4}$/.exec(b || ""); return m ? m[1] : ""; };
     app.innerHTML = `<h2 style="margin-bottom:12px">Nuevo ensayo de durabilidad</h2>
     <form id="fNuevo">
+      <div class="tarjeta lugar-card">
+        <div class="titulo-seccion" style="margin-top:0">📍 ¿Dónde se hace el ensayo?</div>
+        <div class="lugares" id="selLugar">${Object.entries(K.LUGARES).map(([k, l]) => `<button type="button" data-v="${k}" class="${k === "Planta" ? "sel" : ""}"><b>${k === "Planta" ? "🏭 Planta" : "🚚 " + k}</b><small>${k === "Planta" ? "Agrícola Guapa" : l.ciudad}</small></button>`).join("")}</div>
+        <input type="hidden" name="origen" id="inOrigen" value="Planta">
+      </div>
+      <div class="tarjeta transporte-card" id="cardTransporte" hidden>
+        <div class="titulo-seccion" style="margin-top:0">🚚 Transporte al punto de venta</div>
+        <div class="rejilla2">
+          <label class="campo"><span>Destino</span><div class="entrada solo-lectura" id="txtDestino">—</div></label>
+          <label class="campo"><span>Temperatura (°C) *</span><input class="entrada" type="number" step="0.1" inputmode="decimal" name="temperatura_salida" id="inTempSal" placeholder="Ej: 28"></label>
+          <label class="campo"><span>Fecha de salida *</span><input class="entrada" type="date" name="salida_fecha" id="inSalF" value="${h}"></label>
+          <label class="campo"><span>Hora de salida *</span><input class="entrada" type="time" name="salida_hora" id="inSalH"></label>
+        </div>
+        <div class="campo-t"><span>Tipo de vehículo *</span><div class="segmento seg-segVeh" id="segVeh"><button type="button" data-v="Furgón">Furgón</button><button type="button" data-v="Turbo">Turbo</button></div></div>
+        <div class="campo-t"><span>¿Vehículo encarpado? *</span><div class="segmento seg-segCarpa" id="segCarpa"><button type="button" data-v="si">Sí, encarpado</button><button type="button" data-v="no">No</button></div></div>
+        <div class="campo-t"><span>Estado del vehículo *</span><div class="segmento seg-segEstVeh" id="segEstVeh"><button type="button" data-v="Bueno">Bueno</button><button type="button" data-v="Regular">Regular</button><button type="button" data-v="Malo">Malo</button></div></div>
+        <label class="campo"><span>Observación del vehículo</span><input class="entrada" name="obs_vehiculo" maxlength="120" placeholder="Opcional: limpieza, olores, carga mixta…"></label>
+        <p class="suave peq">La <b>fecha y hora de llegada</b> las registra quien recibe la fruta en el punto de venta, desde el ensayo.</p>
+      </div>
       <div class="tarjeta">
         <div class="titulo-seccion" style="margin-top:0">Origen de la fruta</div>
         <div class="rejilla2">
@@ -224,6 +247,24 @@
     llenarBloques();
     // Pileta y fungicida: las primeras N muestras
     const itr = $("#inTratadas"), inm = app.querySelector('[name="num_muestras"]');
+    // Lugar del ensayo y transporte
+    const ahoraHM = () => { const d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+    $("#inSalH").value = ahoraHM();
+    const TR = { vehiculo_tipo: null, carpa: null, estado_vehiculo: null };
+    const segs = [["#segVeh", "vehiculo_tipo"], ["#segCarpa", "carpa"], ["#segEstVeh", "estado_vehiculo"]];
+    segs.forEach(([sel, k]) => app.querySelectorAll(sel + " button").forEach(b => b.onclick = () => {
+      TR[k] = b.dataset.v; app.querySelectorAll(sel + " button").forEach(x => x.classList.toggle("sel", x === b));
+    }));
+    app.querySelectorAll("#selLugar button").forEach(b => b.onclick = () => {
+      const v = b.dataset.v; $("#inOrigen").value = v;
+      app.querySelectorAll("#selLugar button").forEach(x => x.classList.toggle("sel", x === b));
+      const pdv = v !== "Planta";
+      $("#cardTransporte").hidden = !pdv;
+      $("#txtDestino").textContent = pdv ? `${K.LUGARES[v].ciudad} (${v})` : "—";
+      inm.value = pdv ? (C.MUESTRAS_PDV ?? 8) : C.NUM_MUESTRAS;
+      itr.value = pdv ? Math.floor((+inm.value) / 2) : (C.MUESTRAS_TRATADAS ?? 5);
+      txtTr();
+    });
     const txtTr = () => {
       const n = +inm.value || 0, t = Math.max(0, Math.min(+itr.value || 0, n));
       $("#txtTratadas").innerHTML = t === 0 ? "Ninguna muestra pasa por pileta (todas sin tratamiento)."
@@ -250,6 +291,16 @@
       f.semana = semanaISO(f.fecha_inicio); f.creado_por = S.auxiliar;
       f.tipo_cosecha = tipoDeB(f.bloque) || null;
       f.lote = loteDeB(f.bloque) || null;
+      if (f.origen && f.origen !== "Planta") {
+        const falta = [!TR.vehiculo_tipo && "tipo de vehículo", !TR.carpa && "si está encarpado", !TR.estado_vehiculo && "estado del vehículo",
+          f.temperatura_salida == null && "temperatura", !f.salida_fecha && "fecha de salida", !f.salida_hora && "hora de salida"].filter(Boolean);
+        if (falta.length) { $("#cardTransporte").scrollIntoView({ block: "center" }); return toast("Falta en transporte: " + falta.join(", "), true); }
+        f.destino = K.LUGARES[f.origen].ciudad; f.vehiculo_tipo = TR.vehiculo_tipo; f.vehiculo_encarpado = TR.carpa === "si"; f.estado_vehiculo = TR.estado_vehiculo;
+        f.temperatura_salida = Number(String(f.temperatura_salida).replace(",", "."));
+      } else {
+        f.origen = "Planta";
+        ["salida_fecha", "salida_hora", "temperatura_salida", "obs_vehiculo"].forEach(k => delete f[k]);
+      }
       const tratadas = Math.max(0, Math.min(+$("#inTratadas").value || 0, f.num_muestras));
       const ens = await tarea("Creando ensayo…", () => DB.crearEnsayo(f, tratadas));
       toast("Ensayo creado ✓"); abrirEnsayo(ens.id);
@@ -301,6 +352,20 @@
       </div>
     </div>
 
+    ${K.esPDV(e) ? `<div class="tarjeta transporte-card">
+      <div class="fila entre"><h3>🚚 Transporte · ${esc(K.lugarTxt(e))}</h3>${e.llegada_fecha ? `<span class="etq verde">Recibida</span>` : `<span class="etq rojo">En camino</span>`}</div>
+      <div class="datos-mini">
+        <div>Vehículo<b>${esc(e.vehiculo_tipo || "—")}${e.vehiculo_encarpado == null ? "" : e.vehiculo_encarpado ? " · encarpado" : " · sin carpa"}</b></div>
+        <div>Estado vehículo<b>${esc(e.estado_vehiculo || "—")}</b></div>
+        <div>Salida<b>${e.salida_fecha ? K.fechaLarga(e.salida_fecha) + " · " + K.horaTxt(e.salida_hora) : "—"}</b></div>
+        <div>Temperatura<b>${e.temperatura_salida != null ? K.num(e.temperatura_salida) + " °C" : "—"}</b></div>
+        ${e.llegada_fecha ? `<div>Llegada<b>${K.fechaLarga(e.llegada_fecha)} · ${K.horaTxt(e.llegada_hora)}</b></div><div>Tiempo de viaje<b>${K.viajeTxt(e)}</b></div><div>Recibió<b>${esc(e.recibido_por || "—")}</b></div>` : ""}
+        ${e.obs_vehiculo ? `<div style="grid-column:1/-1">Observación<b>${esc(e.obs_vehiculo)}</b></div>` : ""}
+      </div>
+      ${e.llegada_fecha ? `<button class="btn btn-borde" id="btnLlegada" style="margin-top:10px;min-height:40px;font-size:14px">Corregir llegada</button>`
+        : `<button class="btn btn-pri btn-bloque" id="btnLlegada" style="margin-top:12px">📦 Registrar llegada de la fruta</button>`}
+    </div>` : ""}
+
     <div class="dias" id="dias">${Array.from({ length: e.dias_ensayo + 1 }, (_, i) => {
       const c = conteo(i), a = activasEn(i);
       return `<div class="dia ${i === d ? "activo" : ""} ${c && c >= a ? "completo" : ""} ${i === hoyDia ? "hoy" : ""}" data-d="${i}">
@@ -343,6 +408,26 @@
       h.querySelectorAll(".lista-aux button").forEach(b => b.onclick = async () => {
         await tarea("Guardando…", () => DB.actualizarEnsayo(e.id, { muestreador: b.dataset.n })); await recargar(); cerrar(); toast("Muestreador guardado ✓"); vistaEnsayo();
       });
+    };
+    const bll = $("#btnLlegada");
+    if (bll) bll.onclick = () => {
+      const h = $("#hoja"), d0 = new Date();
+      const hoyF = hoyISO(), horaA = String(d0.getHours()).padStart(2, "0") + ":" + String(d0.getMinutes()).padStart(2, "0");
+      h.innerHTML = `<div class="hoja-cuerpo" style="padding-bottom:30px"><div class="hoja-cab"><h2>📦 Llegada a ${esc(K.LUGARES[e.origen].ciudad)}</h2><button class="x" id="cerrarH">✕</button></div>
+        <div class="rejilla2"><label class="campo"><span>Fecha de llegada</span><input class="entrada" type="date" id="llF" value="${e.llegada_fecha || hoyF}"></label>
+        <label class="campo"><span>Hora de llegada</span><input class="entrada" type="time" id="llH" value="${K.horaTxt(e.llegada_hora) !== "—" ? K.horaTxt(e.llegada_hora) : horaA}"></label></div>
+        <p class="suave peq">Recibe: <b>${esc(S.auxiliar || "—")}</b></p>
+        <button class="btn btn-pri btn-bloque" id="llOk">Guardar llegada</button></div>`;
+      h.hidden = false;
+      const cerrar = () => { h.hidden = true; h.innerHTML = ""; };
+      $("#cerrarH").onclick = cerrar;
+      $("#llOk").onclick = async () => {
+        const F = $("#llF").value, H = $("#llH").value;
+        if (!F || !H) return toast("Escriba fecha y hora de llegada", true);
+        if (e.salida_fecha && new Date(F + "T" + H) < new Date(e.salida_fecha + "T" + K.horaTxt(e.salida_hora))) return toast("La llegada no puede ser antes de la salida", true);
+        await tarea("Guardando…", () => DB.actualizarEnsayo(e.id, { llegada_fecha: F, llegada_hora: H, recibido_por: S.auxiliar || null }));
+        await recargar(); cerrar(); toast("Llegada registrada ✓"); vistaEnsayo();
+      };
     };
     const bdm = $("#btnDefMad");
     if (bdm) bdm.onclick = () => {

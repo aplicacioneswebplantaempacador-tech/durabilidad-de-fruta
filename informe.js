@@ -82,7 +82,7 @@
     hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [T("INFORME TÉCNICO DE CALIDAD", { bold: true, color: ARENA, size: 20, characterSpacing: 60 })] }));
     hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: [T("Ensayo de Durabilidad de Fruta", { bold: true, color: NEGRO, size: 52 })] }));
     hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 60 }, children: [T(`Piña MD2  ·  ${titulo}  ·  ${e.grupo_forza || ""}`, { size: 24, color: TEXTO })] }));
-    if (tipoTxt || e.madurez) hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [T([tipoTxt, e.madurez ? "Fruta " + k.madurezTxt(e) : ""].filter(Boolean).join("   ·   ").toUpperCase(), { bold: true, size: 20, color: ARENA, characterSpacing: 30 })] }));
+    if (tipoTxt || e.madurez || k.esPDV(e)) hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [T([k.esPDV(e) ? k.LUGARES[e.origen].nombre : "", tipoTxt, e.madurez ? "Fruta " + k.madurezTxt(e) : ""].filter(Boolean).join("   ·   ").toUpperCase(), { bold: true, size: 20, color: ARENA, characterSpacing: 30 })] }));
     hijos.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: ARENA, space: 1 } }, children: [] }));
 
     // Ficha del documento
@@ -125,7 +125,8 @@
     hijos.push(H1("1. Datos del ensayo"));
     const datosE = [
       ["Fecha de inicio (Día 0)", k.fechaLarga(e.fecha_inicio)], ["Semana", e.semana ?? "—"],
-      ["Bloque", e.bloque || "—"], ["Tipo de cosecha", tipoTxt || "—"],
+      ["Lugar del ensayo", k.esPDV(e) ? k.LUGARES[e.origen].nombre + " (" + e.origen + ")" : "Planta"], ["Bloque", e.bloque || "—"],
+      ["Tipo de cosecha", tipoTxt || "—"],
       ["Estado de madurez inicial", k.madurezTxt(e) || "—"], ["Color inicial promedio", k.num(A.colorIni)],
       ["Con pileta + fungicida", A.tratamiento.con ? A.tratamiento.con.muestras : "Ninguna"], ["Sin tratamiento", A.tratamiento.sin ? A.tratamiento.sin.muestras : "Ninguna"],
       ["Grupo Forza", e.grupo_forza], ["Lote", e.lote || "—"],
@@ -133,6 +134,11 @@
       ["Calibre", e.calibre || "—"], ["Temperatura de almacenamiento", e.temperatura_almacen || "—"],
       ["Aplicación con", e.aplicacion || "No aplica"], ["Dosis", e.dosis || "—"],
       ["Número de muestras", e.num_muestras], ["Días programados / evaluados", `${e.dias_ensayo} / ${A.ultimoDia}`],
+      ...(k.esPDV(e) ? [
+        ["Destino", e.destino || k.LUGARES[e.origen].ciudad], ["Vehículo", (e.vehiculo_tipo || "—") + (e.vehiculo_encarpado == null ? "" : e.vehiculo_encarpado ? " · encarpado" : " · sin carpa")],
+        ["Salida", e.salida_fecha ? k.fechaLarga(e.salida_fecha) + " · " + k.horaTxt(e.salida_hora) : "—"], ["Llegada", e.llegada_fecha ? k.fechaLarga(e.llegada_fecha) + " · " + k.horaTxt(e.llegada_hora) : "Sin registrar"],
+        ["Tiempo de viaje", k.viajeTxt(e)], ["Temperatura de salida", e.temperatura_salida != null ? k.num(e.temperatura_salida) + " °C" : "—"],
+        ["Estado del vehículo", (e.estado_vehiculo || "—") + (e.obs_vehiculo ? " · " + e.obs_vehiculo : "")], ["Recibió en el punto de venta", e.recibido_por || "—"]] : []),
       ["Muestreador responsable", e.muestreador || "—"], ["Estado", e.estado === "cerrado" ? "Cerrado" : "En curso"], ["Auxiliares que registraron", [...new Set(datos.registros.map(r => r.auxiliar).filter(Boolean))].join(", ") || "—"]
     ];
     const a4 = [2300, 2800, 2300, 2800];
@@ -336,7 +342,7 @@
       }]
     });
     const blob = await Packer.toBlob(doc);
-    const nombre = `Informe_Durabilidad_${String(e.bloque || e.lote || "ensayo").replace(/[^\w-]+/g, "_")}${e.madurez ? "_" + e.madurez.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : ""}_${e.fecha_inicio}.docx`;
+    const nombre = `Informe_Durabilidad_${k.esPDV(e) ? e.origen + "_" : ""}${String(e.bloque || e.lote || "ensayo").replace(/[^\w-]+/g, "_")}${e.madurez ? "_" + e.madurez.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : ""}_${e.fecha_inicio}.docx`;
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nombre;
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
     window.__ultimoInforme = blob; // (para pruebas)
