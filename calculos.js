@@ -117,7 +117,7 @@
         (ensayo.vehiculo_tipo ? ` en ${ensayo.vehiculo_tipo.toLowerCase()}${ensayo.vehiculo_encarpado == null ? "" : ensayo.vehiculo_encarpado ? " encarpado" : " sin carpa"}` : "") +
         (ensayo.temperatura_salida != null ? `, a ${num(ensayo.temperatura_salida)} °C` : "") +
         (ensayo.estado_vehiculo ? `, con el vehículo en estado ${ensayo.estado_vehiculo.toLowerCase()}` : "") + "." +
-        (ensayo.llegada_fecha ? ` Llegó el ${fechaLarga(ensayo.llegada_fecha)} a las ${horaTxt(ensayo.llegada_hora)} (viaje de ${viajeTxt(ensayo)})` + (ensayo.recibido_por ? ` y la recibió ${ensayo.recibido_por}.` : ".") : " La llegada aún no se ha registrado."));
+        (!ensayo.salida_fecha ? " La salida del vehículo aún no se ha registrado." : ensayo.llegada_fecha ? ` Llegó el ${fechaLarga(ensayo.llegada_fecha)} a las ${horaTxt(ensayo.llegada_hora)} (viaje de ${viajeTxt(ensayo)})` + (ensayo.recibido_por ? ` y la recibió ${ensayo.recibido_por}.` : ".") : " La llegada aún no se ha registrado."));
     }
     if (registros.length) {
       t.push(retiradas.length

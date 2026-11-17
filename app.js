@@ -130,7 +130,7 @@
       return `<div class="tarjeta ensayo-item" data-id="${e.id}">
         <div class="fila entre"><h3>${esc(K.titulo(e))}</h3>
         <span class="etq ${e.estado === "activo" ? "verde" : "gris"}">${e.estado === "activo" ? "Día " + dia + " de " + e.dias_ensayo : "Cerrado"}</span></div>
-        <div class="etiquetas">${K.esPDV(e) ? `<span class="etq pdv">🚚 ${esc(K.lugarTxt(e))}${e.llegada_fecha ? "" : " · en camino"}</span>` : ""}${e.madurez ? `<span class="etq mad-${e.madurez === "Pintón" ? "Pinton" : e.madurez}">${esc(e.madurez)}</span>` : ""}${K.tipoDe(e) ? `<span class="etq tipo-${K.tipoDe(e)}">${esc(K.tipoTxt(e))}</span>` : ""}<span class="etq">${esc(e.grupo_forza)}</span>${e.muestreador ? `<span class="etq mu">👤 ${esc(e.muestreador)}</span>` : ""}${e.subgrupo_maduracion ? `<span class="etq">Subgrupo ${esc(e.subgrupo_maduracion)}</span>` : ""}
+        <div class="etiquetas">${K.esPDV(e) ? `<span class="etq pdv">🚚 ${esc(K.lugarTxt(e))}${e.llegada_fecha ? "" : e.salida_fecha ? " · en camino" : " · por salir"}</span>` : ""}${e.madurez ? `<span class="etq mad-${e.madurez === "Pintón" ? "Pinton" : e.madurez}">${esc(e.madurez)}</span>` : ""}${K.tipoDe(e) ? `<span class="etq tipo-${K.tipoDe(e)}">${esc(K.tipoTxt(e))}</span>` : ""}<span class="etq">${esc(e.grupo_forza)}</span>${e.muestreador ? `<span class="etq mu">👤 ${esc(e.muestreador)}</span>` : ""}${e.subgrupo_maduracion ? `<span class="etq">Subgrupo ${esc(e.subgrupo_maduracion)}</span>` : ""}
         <span class="etq">Inicio ${K.fechaLarga(e.fecha_inicio)}</span><span class="etq">${e.num_muestras} muestras</span></div>
         <div class="barra-prog"><div style="width:${pct}%"></div></div></div>`;
     };
@@ -162,8 +162,11 @@
       </div>
       <div class="tarjeta transporte-card" id="cardTransporte" hidden>
         <div class="titulo-seccion" style="margin-top:0">🚚 Transporte al punto de venta</div>
+        <label class="campo"><span>Destino</span><div class="entrada solo-lectura" id="txtDestino">—</div></label>
+        <div class="campo-t"><span>¿Cuándo registra los datos del transporte?</span><div class="segmento seg-segVeh" id="segCuando"><button type="button" data-v="ahora" class="sel">Ahora</button><button type="button" data-v="despues">Después, cuando salga</button></div></div>
+        <p class="suave peq" id="txtDespues" hidden>👍 El ensayo se crea ya. Mañana, cuando salga la fruta, entre al ensayo y toque <b>🚚 Registrar salida</b> para llenar vehículo, temperatura, fecha y hora.</p>
+        <div id="camposTr">
         <div class="rejilla2">
-          <label class="campo"><span>Destino</span><div class="entrada solo-lectura" id="txtDestino">—</div></label>
           <label class="campo"><span>Temperatura (°C) *</span><input class="entrada" type="number" step="0.1" inputmode="decimal" name="temperatura_salida" id="inTempSal" placeholder="Ej: 28"></label>
           <label class="campo"><span>Fecha de salida *</span><input class="entrada" type="date" name="salida_fecha" id="inSalF" value="${h}"></label>
           <label class="campo"><span>Hora de salida *</span><input class="entrada" type="time" name="salida_hora" id="inSalH"></label>
@@ -173,6 +176,7 @@
         <div class="campo-t"><span>Estado del vehículo *</span><div class="segmento seg-segEstVeh" id="segEstVeh"><button type="button" data-v="Bueno">Bueno</button><button type="button" data-v="Regular">Regular</button><button type="button" data-v="Malo">Malo</button></div></div>
         <label class="campo"><span>Observación del vehículo</span><input class="entrada" name="obs_vehiculo" maxlength="120" placeholder="Opcional: limpieza, olores, carga mixta…"></label>
         <p class="suave peq">La <b>fecha y hora de llegada</b> las registra quien recibe la fruta en el punto de venta, desde el ensayo.</p>
+        </div>
       </div>
       <div class="tarjeta">
         <div class="titulo-seccion" style="margin-top:0">Origen de la fruta</div>
@@ -250,7 +254,12 @@
     // Lugar del ensayo y transporte
     const ahoraHM = () => { const d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
     $("#inSalH").value = ahoraHM();
-    const TR = { vehiculo_tipo: null, carpa: null, estado_vehiculo: null };
+    const TR = { vehiculo_tipo: null, carpa: null, estado_vehiculo: null, despues: false };
+    app.querySelectorAll("#segCuando button").forEach(b => b.onclick = () => {
+      TR.despues = b.dataset.v === "despues";
+      app.querySelectorAll("#segCuando button").forEach(x => x.classList.toggle("sel", x === b));
+      $("#camposTr").hidden = TR.despues; $("#txtDespues").hidden = !TR.despues;
+    });
     const segs = [["#segVeh", "vehiculo_tipo"], ["#segCarpa", "carpa"], ["#segEstVeh", "estado_vehiculo"]];
     segs.forEach(([sel, k]) => app.querySelectorAll(sel + " button").forEach(b => b.onclick = () => {
       TR[k] = b.dataset.v; app.querySelectorAll(sel + " button").forEach(x => x.classList.toggle("sel", x === b));
@@ -291,7 +300,10 @@
       f.semana = semanaISO(f.fecha_inicio); f.creado_por = S.auxiliar;
       f.tipo_cosecha = tipoDeB(f.bloque) || null;
       f.lote = loteDeB(f.bloque) || null;
-      if (f.origen && f.origen !== "Planta") {
+      if (f.origen && f.origen !== "Planta" && TR.despues) {
+        f.destino = K.LUGARES[f.origen].ciudad;
+        ["salida_fecha", "salida_hora", "temperatura_salida", "obs_vehiculo"].forEach(k => delete f[k]);
+      } else if (f.origen && f.origen !== "Planta") {
         const falta = [!TR.vehiculo_tipo && "tipo de vehículo", !TR.carpa && "si está encarpado", !TR.estado_vehiculo && "estado del vehículo",
           f.temperatura_salida == null && "temperatura", !f.salida_fecha && "fecha de salida", !f.salida_hora && "hora de salida"].filter(Boolean);
         if (falta.length) { $("#cardTransporte").scrollIntoView({ block: "center" }); return toast("Falta en transporte: " + falta.join(", "), true); }
@@ -353,7 +365,7 @@
     </div>
 
     ${K.esPDV(e) ? `<div class="tarjeta transporte-card">
-      <div class="fila entre"><h3>🚚 Transporte · ${esc(K.lugarTxt(e))}</h3>${e.llegada_fecha ? `<span class="etq verde">Recibida</span>` : `<span class="etq rojo">En camino</span>`}</div>
+      <div class="fila entre"><h3>🚚 Transporte · ${esc(K.lugarTxt(e))}</h3>${e.llegada_fecha ? `<span class="etq verde">Recibida</span>` : e.salida_fecha ? `<span class="etq rojo">En camino</span>` : `<span class="etq gris">Por salir</span>`}</div>
       <div class="datos-mini">
         <div>Vehículo<b>${esc(e.vehiculo_tipo || "—")}${e.vehiculo_encarpado == null ? "" : e.vehiculo_encarpado ? " · encarpado" : " · sin carpa"}</b></div>
         <div>Estado vehículo<b>${esc(e.estado_vehiculo || "—")}</b></div>
@@ -362,8 +374,12 @@
         ${e.llegada_fecha ? `<div>Llegada<b>${K.fechaLarga(e.llegada_fecha)} · ${K.horaTxt(e.llegada_hora)}</b></div><div>Tiempo de viaje<b>${K.viajeTxt(e)}</b></div><div>Recibió<b>${esc(e.recibido_por || "—")}</b></div>` : ""}
         ${e.obs_vehiculo ? `<div style="grid-column:1/-1">Observación<b>${esc(e.obs_vehiculo)}</b></div>` : ""}
       </div>
-      ${e.llegada_fecha ? `<button class="btn btn-borde" id="btnLlegada" style="margin-top:10px;min-height:40px;font-size:14px">Corregir llegada</button>`
-        : `<button class="btn btn-pri btn-bloque" id="btnLlegada" style="margin-top:12px">📦 Registrar llegada de la fruta</button>`}
+      ${!e.salida_fecha ? `<p class="peq" style="margin:10px 0 0">Faltan los datos de la salida. Llénelos cuando el vehículo salga con la fruta.</p>
+          <button class="btn btn-pri btn-bloque" id="btnEditTr" style="margin-top:10px">🚚 Registrar salida</button>`
+        : `<div class="fila" style="margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-borde" id="btnEditTr" style="min-height:40px;font-size:14px">✏️ Editar transporte</button>
+          ${e.llegada_fecha ? `<button class="btn btn-borde" id="btnLlegada" style="min-height:40px;font-size:14px">Corregir llegada</button>` : ""}</div>
+          ${e.llegada_fecha ? "" : `<button class="btn btn-pri btn-bloque" id="btnLlegada" style="margin-top:10px">📦 Registrar llegada de la fruta</button>`}`}
     </div>` : ""}
 
     <div class="dias" id="dias">${Array.from({ length: e.dias_ensayo + 1 }, (_, i) => {
@@ -408,6 +424,39 @@
       h.querySelectorAll(".lista-aux button").forEach(b => b.onclick = async () => {
         await tarea("Guardando…", () => DB.actualizarEnsayo(e.id, { muestreador: b.dataset.n })); await recargar(); cerrar(); toast("Muestreador guardado ✓"); vistaEnsayo();
       });
+    };
+    const bet = $("#btnEditTr");
+    if (bet) bet.onclick = () => {
+      const h = $("#hoja"), d0 = new Date();
+      const horaA = String(d0.getHours()).padStart(2, "0") + ":" + String(d0.getMinutes()).padStart(2, "0");
+      const st = { vehiculo_tipo: e.vehiculo_tipo || null, carpa: e.vehiculo_encarpado == null ? null : (e.vehiculo_encarpado ? "si" : "no"), estado_vehiculo: e.estado_vehiculo || null };
+      const seg = (id, k, ops) => `<div class="segmento ${ops.length === 2 ? "seg-segVeh" : ""}" id="${id}">${ops.map(([v, t]) => `<button type="button" data-v="${v}" class="${st[k] === v ? "sel" : ""}">${t}</button>`).join("")}</div>`;
+      h.innerHTML = `<div class="hoja-cuerpo" style="padding-bottom:30px"><div class="hoja-cab"><h2>🚚 Salida a ${esc(K.LUGARES[e.origen].ciudad)}</h2><button class="x" id="cerrarH">✕</button></div>
+        <div class="rejilla2">
+          <label class="campo"><span>Fecha de salida *</span><input class="entrada" type="date" id="edSalF" value="${e.salida_fecha || hoyISO()}"></label>
+          <label class="campo"><span>Hora de salida *</span><input class="entrada" type="time" id="edSalH" value="${e.salida_hora ? K.horaTxt(e.salida_hora) : horaA}"></label>
+          <label class="campo"><span>Temperatura (°C) *</span><input class="entrada" type="number" step="0.1" inputmode="decimal" id="edTemp" value="${e.temperatura_salida ?? ""}" placeholder="Ej: 28"></label>
+        </div>
+        <div class="campo-t"><span>Tipo de vehículo *</span>${seg("edVeh", "vehiculo_tipo", [["Furgón", "Furgón"], ["Turbo", "Turbo"]])}</div>
+        <div class="campo-t"><span>¿Vehículo encarpado? *</span>${seg("edCarpa", "carpa", [["si", "Sí, encarpado"], ["no", "No"]])}</div>
+        <div class="campo-t"><span>Estado del vehículo *</span><div id="segEstVehWrap">${seg("segEstVeh", "estado_vehiculo", [["Bueno", "Bueno"], ["Regular", "Regular"], ["Malo", "Malo"]])}</div></div>
+        <label class="campo"><span>Observación del vehículo</span><input class="entrada" id="edObs" maxlength="120" value="${esc(e.obs_vehiculo || "")}" placeholder="Opcional"></label>
+        <button class="btn btn-pri btn-bloque" id="edOk">Guardar transporte</button></div>`;
+      h.hidden = false;
+      const cerrar = () => { h.hidden = true; h.innerHTML = ""; };
+      $("#cerrarH").onclick = cerrar;
+      [["#edVeh", "vehiculo_tipo"], ["#edCarpa", "carpa"], ["#segEstVeh", "estado_vehiculo"]].forEach(([sel, k]) => h.querySelectorAll(sel + " button").forEach(b => b.onclick = () => {
+        st[k] = b.dataset.v; h.querySelectorAll(sel + " button").forEach(x => x.classList.toggle("sel", x === b));
+      }));
+      $("#edOk").onclick = async () => {
+        const F = $("#edSalF").value, H = $("#edSalH").value, tv = $("#edTemp").value.trim();
+        const falta = [!st.vehiculo_tipo && "tipo de vehículo", !st.carpa && "si está encarpado", !st.estado_vehiculo && "estado del vehículo", !tv && "temperatura", !F && "fecha de salida", !H && "hora de salida"].filter(Boolean);
+        if (falta.length) return toast("Falta: " + falta.join(", "), true);
+        if (e.llegada_fecha && new Date(F + "T" + H) > new Date(e.llegada_fecha + "T" + K.horaTxt(e.llegada_hora))) return toast("La salida no puede ser después de la llegada", true);
+        await tarea("Guardando…", () => DB.actualizarEnsayo(e.id, { destino: K.LUGARES[e.origen].ciudad, salida_fecha: F, salida_hora: H, temperatura_salida: Number(tv.replace(",", ".")),
+          vehiculo_tipo: st.vehiculo_tipo, vehiculo_encarpado: st.carpa === "si", estado_vehiculo: st.estado_vehiculo, obs_vehiculo: $("#edObs").value.trim() || null }));
+        await recargar(); cerrar(); toast("Transporte guardado ✓"); vistaEnsayo();
+      };
     };
     const bll = $("#btnLlegada");
     if (bll) bll.onclick = () => {
